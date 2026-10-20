@@ -6,9 +6,12 @@ import pytest
 
 from dagsched import (
     SCHEDULERS,
+    BernoulliFailures,
     CriticalPathScheduler,
     FIFOScheduler,
     HEFTScheduler,
+    RetryPolicy,
+    SimulationConfig,
     Task,
     TaskGraph,
     TaskRecord,
@@ -168,6 +171,21 @@ def test_heft_reservation_steers_later_task_in_same_decision():
 def test_heft_select_before_reset_fails():
     with pytest.raises(RuntimeError, match="reset"):
         HEFTScheduler().select(None)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("k", [2, 4, 8])
+@pytest.mark.parametrize("p", [0.0, 0.2])
+def test_cp_and_heft_identical_on_homogeneous_workers(random_dags, make_workers, k, p):
+    # Proof: docs/theory/03-schedulers.md, "On identical workers, cp and HEFT produce
+    # identical schedules". Failures do not break it: attempt fates do not depend on the
+    # scheduler (common random numbers).
+    workers = make_workers(k)
+    config = SimulationConfig(failure_model=BernoulliFailures(p), retry=RetryPolicy(5))
+    for index, graph in enumerate(random_dags):
+        cp = simulate(graph, workers, CriticalPathScheduler(), seed=index, config=config)
+        heft = simulate(graph, workers, HEFTScheduler(), seed=index, config=config)
+        assert cp.records == heft.records, f"graph {index}"
+        assert cp.attempts == heft.attempts, f"graph {index}"
 
 
 # ----- registry ------------------------------------------------------------------------------

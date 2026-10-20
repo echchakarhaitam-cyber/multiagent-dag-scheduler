@@ -50,6 +50,31 @@ worker is idle and the task starts. On identical workers a free idle worker alwa
 earliest finish time, so HEFT is then work-conserving and Graham's bound holds. The randomized
 tests check this.
 
+**On identical workers, cp and HEFT produce identical schedules.** Proof, for k workers of
+speed s:
+1. **Same task order.** mean_cost(v) = duration(v) · mean_w(1/s) = duration(v)/s. With s = 1,
+   as in the experiments, the upward rank is exactly the bottom level, computed by the same
+   arithmetic. For general s it is the bottom level divided by s, which preserves the order.
+   Both schedulers take ready tasks in (−level, id) order.
+2. **Same worker choice.** Let task v be next in that order, with d = duration(v)/s, and call
+   an idle worker *free* if no task has been placed on it yet in this decision.
+   - A free idle worker has EFT = now + d.
+   - A running worker has EFT = expected_end + d > now + d. Its nominal expected end is after
+     `now`, because all events at `now` are applied before the decision.
+   - A worker already taken or reserved in this decision has EFT ≥ now + d + d′ > now + d.
+
+   So while a free idle worker exists, v's best worker is the free idle worker with the
+   smallest id. That is exactly the worker cp gives it: cp pairs tasks in (−level, id) order
+   with idle workers in (−speed, id) = id order.
+3. **Same number of starts.** HEFT stops only when no free idle worker is left, so both start
+   min(#ready, #idle) tasks.
+
+Steps 1–3 hold at every decision point, and the simulator applies the same events in the same
+order. So the TaskRecords and AttemptRecords coincide, including with failures, because
+failure draws do not depend on the scheduler (common random numbers). The test
+`test_cp_and_heft_identical_on_homogeneous_workers` checks this on 50 random DAGs with k ∈ {2,
+4, 8}, without failures and with p = 0.2.
+
 ## Why waiting can beat working
 **Case (b).** Workers fast (speed 2) and slow (speed 0.5); two independent tasks t1(4), t2(4).
 The lower bound is max(4/2, 8/2.5) = 3.2.

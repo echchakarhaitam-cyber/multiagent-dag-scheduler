@@ -113,9 +113,13 @@ Source: `results/e1/paired.csv`
 
 ### Observations
 
-- cp and heft have identical values in every cell of both E1 tables. With all speeds equal to
-  1, HEFT's upward rank equals the bottom level used by cp, and its earliest-finish-time
-  choice reduces to the lowest-id idle worker, so the two produced the same schedules here.
+- cp and heft have identical values in every cell of both E1 tables. This is not a
+  coincidence of these instances: on identical workers the two produce identical schedules.
+  The proof is in [docs/theory/03-schedulers.md](theory/03-schedulers.md) ("On identical
+  workers, cp and HEFT produce identical schedules"), and
+  `test_cp_and_heft_identical_on_homogeneous_workers` checks it on 50 random DAGs, with and
+  without failures. On homogeneous workers, E1 and E3 therefore compare three distinct
+  policies, not four.
 - Against fifo, cp and heft have a lower mean normalized makespan with a significant paired
   difference for k ≤ 8 on layered and Erdős–Rényi graphs and for k ≤ 4 on fork–join graphs,
   and additionally for Erdős–Rényi with uniform durations at k = 16 (Δ = −0.012, p_H 0.005).
@@ -512,7 +516,8 @@ Source: `results/e3/paired_vs_cp.csv`
   schedulers. On heterogeneous workers it differs slightly between schedulers, e.g.
   fork–join, lognormal, p = 0.3: fifo 46.3 [36.9, 55.8] vs heft 37.6 [31.4, 44.5]. These CIs
   overlap, and wasted work was not tested pairwise, so no difference is claimed.
-- Ranking on homogeneous workers: cp = heft has the lowest mean in every row, and the paired
+- Ranking on homogeneous workers: cp = heft (identical schedules, see the proof referenced in
+  RQ1, which also covers failures) has the lowest mean in every row, and the paired
   difference to fifo is significant at every p except layered, uniform, p = 0.3 (−0.046,
   p_H 0.058). The size of the difference changes with p in both directions: fork–join,
   lognormal goes −0.065 (p = 0) → −0.022 (p = 0.3); layered, uniform goes −0.018 → −0.046.
