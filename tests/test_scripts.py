@@ -130,6 +130,17 @@ def test_render_fills_blocks_from_csv(scratch):
     assert tables.render(rendered, results) == rendered  # idempotent
 
 
+def test_block_versus_other_baseline(scratch):
+    results = e1_results(scratch)
+    summarize_directory(results / "e1", "cp", "paired_vs_cp.csv")
+    block = tables.block_versus(results, "e1", ("graph_family", "dist", "k"), "fifo",
+                                "paired_vs_cp.csv")
+    assert "| graph | durations | k | fifo − cp |" in block
+    assert "+0.250 [+0.250, +0.250]; win 0.00; p_H 0.125" in block
+    with pytest.raises(tables.TableError, match="no rows for 'heft'"):
+        tables.block_versus(results, "e1", ("k",), "heft", "paired_vs_cp.csv")
+
+
 def test_significance_rule():
     row = {"p_holm": "0.01", "ci_low": "-0.2", "ci_high": "-0.1"}
     assert tables.is_significant(row)

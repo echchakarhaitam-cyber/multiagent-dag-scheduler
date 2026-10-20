@@ -210,8 +210,14 @@ def _write(rows: list[dict[str, Any]], columns: tuple[str, ...], path: Path) -> 
         writer.writerows(rows)
 
 
-def summarize_directory(directory: str | Path, baseline: str = "fifo") -> tuple[int, int]:
-    """Read <directory>/runs.csv, write summary.csv and paired.csv; return their row counts."""
+def summarize_directory(
+    directory: str | Path, baseline: str = "fifo", paired_name: str = "paired.csv"
+) -> tuple[int, int]:
+    """Read <directory>/runs.csv, write summary.csv and the paired comparisons against
+    `baseline` to `paired_name` (so comparisons against several baselines can coexist);
+    return their row counts. p_holm is adjusted over the comparisons of that one file."""
+    if Path(paired_name).name != paired_name or not paired_name.endswith(".csv"):
+        raise SummaryError(f"paired output must be a plain .csv file name, got {paired_name!r}")
     directory = Path(directory)
     runs = read_runs(directory / "runs.csv")
     if not runs:
@@ -219,5 +225,5 @@ def summarize_directory(directory: str | Path, baseline: str = "fifo") -> tuple[
     summary = summarize_runs(runs)
     paired = paired_comparisons(runs, baseline)
     _write(summary, SUMMARY_COLUMNS, directory / "summary.csv")
-    _write(paired, PAIRED_COLUMNS, directory / "paired.csv")
+    _write(paired, PAIRED_COLUMNS, directory / paired_name)
     return len(summary), len(paired)

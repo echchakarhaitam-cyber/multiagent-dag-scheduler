@@ -133,6 +133,19 @@ def block_paired(results: Path, experiment: str, keys: Sequence[str]) -> str:
     return _source(results, experiment, "paired.csv") + "\n\n" + markdown_table(header, body)
 
 
+def block_versus(results: Path, experiment: str, keys: Sequence[str], scheduler: str,
+                 filename: str, speeds_kind: str | None = None) -> str:
+    """One scheduler's paired differences against the baseline of `filename`."""
+    rows = [r for r in _read_csv(results / experiment / filename)
+            if r["scheduler"] == scheduler
+            and (speeds_kind is None or r["speeds_kind"] == speeds_kind)]
+    if not rows:
+        raise TableError(f"no rows for {scheduler!r} in {results / experiment / filename}")
+    header, body = pivot(rows, keys, fmt_paired)
+    header[-1] = f"{scheduler} − {rows[0]['baseline']}"
+    return _source(results, experiment, filename) + "\n\n" + markdown_table(header, body)
+
+
 def block_reliability(results: Path, experiment: str, keys: Sequence[str]) -> str:
     rows = _read_csv(results / experiment / "summary.csv")
 
@@ -154,6 +167,9 @@ BLOCKS: dict[str, Callable[[Path], str]] = {
     "e1_paired": lambda r: block_paired(r, "e1", _GRAPH_KEYS),
     "e2_makespan": lambda r: block_makespan(r, "e2", _GRAPH_KEYS),
     "e2_paired": lambda r: block_paired(r, "e2", _GRAPH_KEYS),
+    "e2_heft_vs_cp": lambda r: block_versus(r, "e2", _GRAPH_KEYS, "heft", "paired_vs_cp.csv"),
+    "e3_heft_vs_cp": lambda r: block_versus(r, "e3", _FAILURE_KEYS[1:], "heft",
+                                            "paired_vs_cp.csv", speeds_kind="heterogeneous"),
     "e3_makespan": lambda r: block_makespan(r, "e3", _FAILURE_KEYS),
     "e3_reliability": lambda r: block_reliability(r, "e3", _FAILURE_KEYS),
     "e3_paired": lambda r: block_paired(r, "e3", _FAILURE_KEYS),

@@ -29,7 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
     summarize = commands.add_parser("summarize", help="write summary.csv and paired.csv")
     summarize.add_argument("directory", type=Path, help="directory containing runs.csv")
     summarize.add_argument("--baseline", default="fifo", help="baseline scheduler (default fifo)")
-    plot = commands.add_parser("plot", help="draw figures from summary.csv (needs matplotlib)")
+    summarize.add_argument("--paired-out", default="paired.csv",
+                           help="file name for the paired comparisons (default paired.csv)")
+    plot =commands.add_parser("plot", help="draw figures from summary.csv (needs matplotlib)")
     plot.add_argument("directory", type=Path, help="directory containing summary.csv")
     plot.add_argument("--out", type=Path, required=True, help="output directory for PNG files")
     return parser
@@ -42,9 +44,9 @@ def _run(args: argparse.Namespace) -> None:
 
 
 def _summarize(args: argparse.Namespace) -> None:
-    n_summary, n_paired = summarize_directory(args.directory, args.baseline)
+    n_summary, n_paired = summarize_directory(args.directory, args.baseline, args.paired_out)
     print(f"{n_summary} groups written to {args.directory / 'summary.csv'}, "
-          f"{n_paired} comparisons vs {args.baseline!r} to {args.directory / 'paired.csv'}")
+          f"{n_paired} comparisons vs {args.baseline!r} to {args.directory / args.paired_out}")
 
 
 def _plot(args: argparse.Namespace) -> None:

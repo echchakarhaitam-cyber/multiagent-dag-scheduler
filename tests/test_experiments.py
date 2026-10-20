@@ -356,6 +356,20 @@ def test_cli_summarize(smoke_run, scratch, capsys):
     assert "runs file not found" in capsys.readouterr().err
 
 
+def test_summarize_paired_out_keeps_both_baselines(smoke_run, scratch, capsys):
+    out, _ = smoke_run
+    (scratch / "runs.csv").write_bytes((out / "runs.csv").read_bytes())
+    assert main(["summarize", str(scratch)]) == 0
+    assert main(["summarize", str(scratch), "--baseline", "cp",
+                 "--paired-out", "paired_vs_cp.csv"]) == 0
+    assert "to " + str(scratch / "paired_vs_cp.csv") in capsys.readouterr().out
+    assert {r["baseline"] for r in read_csv(scratch / "paired.csv")} == {"fifo"}
+    assert {r["baseline"] for r in read_csv(scratch / "paired_vs_cp.csv")} == {"cp"}
+    for bad in ("../escape.csv", "paired.txt"):
+        with pytest.raises(SummaryError, match="plain .csv file name"):
+            summarize_directory(scratch, "cp", bad)
+
+
 def write_json(path: Path, data) -> Path:
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
