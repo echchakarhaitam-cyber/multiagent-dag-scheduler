@@ -150,6 +150,24 @@ def test_heterogeneous_workers_are_seeded_and_shared(scratch):
     assert [row["speeds"] for row in rerun] == [row["speeds"] for row in rows]
 
 
+def test_run_seed_shared_within_instance_and_distinct_across_graphs(scratch):
+    # Same structure and task ids for every graph seed (fork_join); only the run seed can make
+    # the failure draws differ. Before run seeds existed, all ten instances failed identically.
+    config = parse_config(tiny_config(
+        graph_seeds=list(range(10)), failures=[{"p": 0.5}],
+        workers=[{"k": 2, "speeds": "homogeneous"},
+                 {"k": 2, "speeds": "uniform", "low": 0.5, "high": 2.0}],
+    ))
+    rows = run_experiment(config, scratch)
+    seeds = {}
+    for row in rows:
+        seeds.setdefault(row["graph_seed"], set()).add(row["run_seed"])
+    assert all(len(s) == 1 for s in seeds.values())  # all schedulers and worker sets agree
+    assert len({next(iter(s)) for s in seeds.values()}) == 10
+    homogeneous_fifo = [r for r in rows if r["scheduler"] == "fifo" and r["speeds"] == "[1.0, 1.0]"]
+    assert len({r["n_attempts"] for r in homogeneous_fifo}) > 1
+
+
 def test_invalid_schedule_aborts_without_writing(scratch, monkeypatch):
     def reject(*args, **kwargs):
         raise ScheduleViolation("injected")

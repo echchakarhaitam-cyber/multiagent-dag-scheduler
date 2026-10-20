@@ -29,9 +29,14 @@ Comparisons are therefore made on per-instance differences, which removes the
 instance-to-instance variation that would otherwise dominate. Every run is checked by the
 independent validator. An invalid schedule aborts the experiment and is never recorded.
 
-Failure draws are keyed by the simulation seed and the task id. Different graph instances with
-the same simulation seed therefore share draws for equally named tasks. Their structure and
-durations differ, so this is a mild correlation between instances, not between schedulers.
+Independent replicates. The simulator keys failure draws by (seed, task id, attempt), and every
+generated graph reuses the ids t000, t001, … With the bare `sim_seed`, all graph instances
+would face one identical failure pattern. That happened in a first run of E3, where every
+graph seed had exactly the same attempt counts; it was discarded and rerun. Each instance
+therefore runs with its own `run_seed` = first 8 bytes of
+sha256(family | params | graph_seed | sim_seed), recorded in `runs.csv`. It is shared by all
+schedulers and worker sets of the instance, so common random numbers hold within a
+comparison, and it differs between instances.
 
 ## Graph families (`dagsched.generators`, all seeded)
 - **layered**: n tasks spread evenly over L layers. Edges go to the next layer with

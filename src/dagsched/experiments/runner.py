@@ -5,6 +5,14 @@ instance and the SAME worker set are given to every scheduler, and because failu
 common random numbers (see dagsched.failures) every scheduler also faces the same attempt
 fates. Differences between schedulers on one such key are therefore attributable to the policy.
 
+Independence across graph instances: the simulator keys its failure draws by
+(seed, task id, attempt), and generated graphs reuse the ids t000, t001, ... If every instance
+were simulated with the bare sim_seed, all graph instances would share ONE failure pattern and
+the graph seeds would not be independent replicates. Each instance therefore gets its own
+run_seed = sha256(family | params | graph_seed | sim_seed); it is the same for every scheduler
+and worker set of that instance (common random numbers within a comparison) and recorded in
+runs.csv.
+
 runs.csv contains no wall-clock values, so rerunning a config reproduces it byte for byte;
 timing and provenance go to metadata.json instead.
 """
@@ -12,6 +20,7 @@ timing and provenance go to metadata.json instead.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import platform
 import subprocess
@@ -34,7 +43,7 @@ from dagsched.validation import ScheduleViolation, validate_schedule
 RUN_COLUMNS = (
     "experiment", "graph_family", "graph_params", "graph_seed", "n_tasks", "n_edges", "depth",
     "critical_length", "total_work", "parallelism", "k", "speeds", "failure_p", "max_attempts",
-    "duplicate_prob", "sim_seed", "scheduler", "status", "makespan", "lower_bound",
+    "duplicate_prob", "sim_seed", "run_seed", "scheduler", "status", "makespan", "lower_bound",
     "normalized_makespan", "utilization", "wasted_work", "n_attempts", "n_failed_tasks",
     "n_cancelled_tasks", "duplicates_ignored",
 )
@@ -56,6 +65,14 @@ class _Instance:
     lower_bound: float
     failure_p: float
     sim_seed: int
+    run_seed: int
+
+
+def instance_seed(spec: GraphSpec, graph_seed: int, sim_seed: int) -> int:
+    """Simulation seed of one graph instance: deterministic, distinct across instances, and
+    independent of the scheduler and the worker set."""
+    key = f"{spec.family}|{spec.params_json()}|{graph_seed}|{sim_seed}"
+    return int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big")
 
 
 def _instances(config: ExperimentConfig) -> Iterator[_Instance]:
@@ -69,7 +86,8 @@ def _instances(config: ExperimentConfig) -> Iterator[_Instance]:
                 for failure_p in config.failure_ps:
                     for sim_seed in config.sim_seeds:
                         yield _Instance(spec, graph_seed, graph, stats, workers, bound,
-                                        failure_p, sim_seed)
+                                        failure_p, sim_seed,
+                                        instance_seed(spec, graph_seed, sim_seed))
 
 
 def _row(config: ExperimentConfig, inst: _Instance, result: SimulationResult) -> dict[str, Any]:
@@ -85,6 +103,7 @@ def _row(config: ExperimentConfig, inst: _Instance, result: SimulationResult) ->
         "max_attempts": config.retry.max_attempts,
         "duplicate_prob": config.duplicate_delivery_prob,
         "sim_seed": inst.sim_seed,
+        "run_seed": inst.run_seed,
         "scheduler": result.scheduler_name,
         "status": result.status,
         "makespan": result.makespan,
@@ -110,7 +129,7 @@ def iter_runs(config: ExperimentConfig) -> Iterator[dict[str, Any]]:
         )
         for name in config.schedulers:
             result = simulate(inst.graph, inst.workers, get_scheduler(name),
-                              seed=inst.sim_seed, config=sim_config)
+                              seed=inst.run_seed, config=sim_config)
             try:
                 validate_schedule(inst.graph, inst.workers, result,
                                   max_attempts=config.retry.max_attempts)
