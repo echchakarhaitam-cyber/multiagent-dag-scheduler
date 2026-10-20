@@ -31,7 +31,14 @@ def build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("--baseline", default="fifo", help="baseline scheduler (default fifo)")
     summarize.add_argument("--paired-out", default="paired.csv",
                            help="file name for the paired comparisons (default paired.csv)")
-    plot =commands.add_parser("plot", help="draw figures from summary.csv (needs matplotlib)")
+    ablation = commands.add_parser("ablation", help="run an ablation study (RQ4/RQ5)")
+    ablation.add_argument("study", choices=["idempotency"], help="which ablation")
+    ablation.add_argument("--out", type=Path, required=True, help="output directory")
+    ablation.add_argument("--graphs", type=Path, default=Path("configs/e1_homogeneous.json"),
+                          help="config whose graph specs are used (default: E1)")
+    ablation.add_argument("--graph-seeds", type=int, default=30,
+                          help="number of graph seeds 0..N-1 (default 30)")
+    plot = commands.add_parser("plot", help="draw figures from summary.csv (needs matplotlib)")
     plot.add_argument("directory", type=Path, help="directory containing summary.csv")
     plot.add_argument("--out", type=Path, required=True, help="output directory for PNG files")
     return parser
@@ -57,15 +64,29 @@ def _plot(args: argparse.Namespace) -> None:
         print(f"wrote {path}")
 
 
+def _ablation(args: argparse.Namespace) -> None:
+    from dagsched.experiments.ablations import AblationError, idempotency_ablation
+
+    if args.graph_seeds < 1:
+        raise AblationError(f"--graph-seeds must be >= 1, got {args.graph_seeds}")
+    n_runs, problems = idempotency_ablation(args.out, args.graphs, args.graph_seeds)
+    print(f"{args.study}: {n_runs} runs written to {args.out / 'runs.csv'} "
+          f"(+ summary.csv, metadata.json)")
+    if problems:
+        raise AblationError("; ".join(problems) + " -- this indicates a bug")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point; returns the process exit code (0 on success, 1 on a reported error)."""
+    from dagsched.experiments.ablations import AblationError
     from dagsched.experiments.plots import PlotError
 
     args = build_parser().parse_args(argv)
-    commands = {"run": _run, "summarize": _summarize, "plot": _plot}
+    commands = {"run": _run, "summarize": _summarize, "plot": _plot, "ablation": _ablation}
     try:
         commands[args.command](args)
-    except (ConfigError, ExperimentError, SummaryError, PlotError, OSError) as exc:
+    except (ConfigError, ExperimentError, SummaryError, PlotError, AblationError,
+            OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
