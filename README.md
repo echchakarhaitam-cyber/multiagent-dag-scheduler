@@ -258,7 +258,8 @@ A2, var(d) without CRN / var(d) with CRN for d = cp − fifo, 300 pairs per cell
 - Randomized tests on 50 seeded DAGs check validity, the lower bound and Graham's bound for
   every scheduler, plus determinism (same seed, identical result).
 - Hand-computed schedules are pinned in tests, and reruns are byte-identical.
-- `pytest -q`: 478 passed (about 35 s on the development laptop).
+- `pytest -q`: 478 passed with the `experiments` extra installed; in a fresh `.[dev]`-only
+  install the 4 plot tests are skipped (474 passed, 4 skipped).
 
 ## Limitations
 
