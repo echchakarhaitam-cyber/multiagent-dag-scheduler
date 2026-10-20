@@ -11,7 +11,8 @@ from __future__ import annotations
 import math
 import random
 import statistics
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 
 def _non_empty(values: Sequence[float], what: str = "values") -> list[float]:
@@ -30,9 +31,16 @@ def mean_std(values: Sequence[float]) -> tuple[float, float]:
 
 
 def bootstrap_ci(
-    values: Sequence[float], level: float = 0.95, n_resamples: int = 2000, seed: int = 0
+    values: Sequence[Any],
+    level: float = 0.95,
+    n_resamples: int = 2000,
+    seed: int = 0,
+    statistic: Callable[[list[Any]], float] = statistics.fmean,
 ) -> tuple[float, float]:
-    """Percentile-bootstrap confidence interval for the mean.
+    """Percentile-bootstrap confidence interval for `statistic` (default: the mean).
+
+    `values` may be any items (e.g. pairs) as long as `statistic` accepts a list of them; the
+    items are resampled as units, which keeps paired observations together.
 
     Resamples the data with replacement `n_resamples` times using random.Random(seed), so the
     interval is deterministic for given inputs. Percentile method: the interval is formed by the
@@ -46,7 +54,7 @@ def bootstrap_ci(
         raise ValueError(f"n_resamples must be a positive int, got {n_resamples!r}")
     rng = random.Random(seed)
     n = len(data)
-    means = sorted(statistics.fmean(rng.choices(data, k=n)) for _ in range(n_resamples))
+    means = sorted(statistic(rng.choices(data, k=n)) for _ in range(n_resamples))
     alpha = (1.0 - level) / 2.0
     low_index = min(n_resamples - 1, max(0, math.floor(alpha * n_resamples)))
     high_index = min(n_resamples - 1, max(0, math.ceil((1.0 - alpha) * n_resamples) - 1))

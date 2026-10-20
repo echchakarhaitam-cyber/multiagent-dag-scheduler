@@ -448,6 +448,44 @@ def test_random_dags_with_failures(random_dags, make_workers, name, p, k):
 # ----- common random numbers -----------------------------------------------------------------
 
 
+def attempts_per_task(graph, workers, name, seed, config):
+    result = simulate(graph, workers, get_scheduler(name), seed=seed, config=config)
+    return tuple(sorted(Counter(a.task_id for a in result.attempts).items()))
+
+
+def test_crn_default_is_on_and_explicit_true_changes_nothing(random_dags, make_workers):
+    assert SimulationConfig().common_random_numbers is True
+    implicit = SimulationConfig(failure_model=BernoulliFailures(0.3), retry=RetryPolicy(5))
+    explicit = SimulationConfig(failure_model=BernoulliFailures(0.3), retry=RetryPolicy(5),
+                                common_random_numbers=True)
+    workers = make_workers(2)
+    for index, graph in enumerate(random_dags[:5]):
+        assert (simulate(graph, workers, get_scheduler("cp"), seed=index, config=implicit)
+                == simulate(graph, workers, get_scheduler("cp"), seed=index, config=explicit))
+
+
+def test_without_crn_schedulers_face_independent_failures(random_dags, make_workers):
+    config = SimulationConfig(failure_model=BernoulliFailures(0.3), retry=RetryPolicy(5),
+                              common_random_numbers=False)
+    workers = make_workers(2)
+    differing = [
+        index for index, graph in enumerate(random_dags[:10])
+        if attempts_per_task(graph, workers, "fifo", index, config)
+        != attempts_per_task(graph, workers, "cp", index, config)
+    ]
+    assert differing  # some graph where the two schedulers saw different attempt counts
+    # Still deterministic per scheduler and seed.
+    graph = random_dags[0]
+    assert (attempts_per_task(graph, workers, "fifo", 0, config)
+            == attempts_per_task(graph, workers, "fifo", 0, config))
+
+
+@pytest.mark.parametrize("value", [0, 1, "yes", None])
+def test_crn_flag_must_be_bool(value):
+    with pytest.raises(TypeError, match="common_random_numbers must be a bool"):
+        SimulationConfig(common_random_numbers=value)
+
+
 def test_attempt_fates_identical_across_schedulers(random_dags, make_workers):
     config = SimulationConfig(failure_model=BernoulliFailures(0.3), retry=RetryPolicy(5))
     workers = make_workers(2)

@@ -145,8 +145,15 @@ class SimulationConfig:
     duplicate_delivery_prob: float = 0.0
     duplicate_delay: float = 0.0
     idempotent_collection: bool = True
+    common_random_numbers: bool = True
+    """True (default): the failure draw of (task, attempt) is the same whatever the scheduler.
+    False: it also depends on the scheduler name, so schedulers face independent failures.
+    False exists for the RQ5 ablation that measures what common random numbers buy."""
 
     def __post_init__(self) -> None:
+        for flag in ("idempotent_collection", "common_random_numbers"):
+            if not isinstance(getattr(self, flag), bool):
+                raise TypeError(f"{flag} must be a bool, got {getattr(self, flag)!r}")
         if not callable(getattr(self.failure_model, "fail_fraction", None)):
             raise TypeError(f"failure_model must have fail_fraction(), got {self.failure_model!r}")
         if not isinstance(self.retry, RetryPolicy):
@@ -474,8 +481,13 @@ class _Simulation:
             self._push(self.time + fraction * exec_time, _ATTEMPT_FAILED, attempt)
 
     def _fail_fraction(self, task_id: str, worker_id: str, attempt: int) -> float | None:
-        # Common random numbers: the draw depends only on (seed, task, attempt).
-        u = random.Random(f"{self.seed}:{task_id}:{attempt}").random()
+        # Common random numbers: the draw depends only on (seed, task, attempt). Without them,
+        # the scheduler name is part of the key, giving each scheduler independent failures.
+        if self.config.common_random_numbers:
+            key = f"{self.seed}:{task_id}:{attempt}"
+        else:
+            key = f"{self.seed}:{self.scheduler.name}:{task_id}:{attempt}"
+        u = random.Random(key).random()
         return check_fail_fraction(
             self.config.failure_model.fail_fraction(task_id, worker_id, attempt, u)
         )

@@ -60,6 +60,18 @@ def test_bootstrap_ci_validation(kwargs):
         bootstrap_ci([1.0, 2.0], **kwargs)
 
 
+def test_bootstrap_ci_custom_statistic_resamples_items_as_units():
+    pairs = [(1.0, 10.0), (2.0, 20.0), (3.0, 30.0), (4.0, 40.0)]
+
+    def ratio_of_means(sample):
+        return statistics.fmean(b for _, b in sample) / statistics.fmean(a for a, _ in sample)
+
+    # Each resample keeps pairs together, so the ratio is exactly 10 in every resample.
+    assert bootstrap_ci(pairs, statistic=ratio_of_means) == pytest.approx((10.0, 10.0))
+    values = [1.0, 2.0, 5.0]
+    assert bootstrap_ci(values) == bootstrap_ci(values, statistic=statistics.fmean)
+
+
 def test_paired_differences():
     assert paired_differences([3, 5, 1], [1, 5, 2]) == [2, 0, -1]
     with pytest.raises(ValueError, match="equal length"):

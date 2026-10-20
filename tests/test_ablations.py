@@ -9,12 +9,16 @@ import pytest
 
 from dagsched.experiments.__main__ import main
 from dagsched.experiments.ablations import (
+    CrnGrid,
     IdempotencyGrid,
     check_idempotency,
     classify_violation,
     graph_specs,
+    run_crn,
     run_idempotency,
+    summarize_crn,
     summarize_idempotency,
+    variance_ratio,
 )
 from dagsched.validation import ScheduleViolation
 
@@ -113,6 +117,80 @@ def test_cli_idempotency_smoke(scratch, capsys):
     assert len(summary) == 16
     assert all(row["n_invalid"] == "0" for row in summary if row["idempotent"] == "True")
     assert (out / "runs.csv").is_file() and (out / "metadata.json").is_file()
+
+
+@pytest.fixture(scope="module")
+def crn_rows():
+    grid = CrnGrid(graph_seeds=(0, 1), sim_seeds=(0, 1), failure_ps=(0.2,))
+    return run_crn(graph_specs(E1_CONFIG)[:2], grid)
+
+
+def test_crn_grid_and_shared_seeds(crn_rows):
+    # 2 specs x 2 graph seeds x 1 p x 2 crn x 2 sim seeds x 2 schedulers.
+    assert len(crn_rows) == 32
+    seeds = {}
+    for row in crn_rows:
+        seeds.setdefault((row["graph_params"], row["graph_seed"], row["sim_seed"]),
+                         set()).add(row["run_seed"])
+    assert all(len(s) == 1 for s in seeds.values())  # crn arms and schedulers share the seed
+
+
+def test_crn_arm_has_identical_attempt_counts(crn_rows):
+    by_key = {}
+    for row in crn_rows:
+        key = (row["graph_params"], row["graph_seed"], row["sim_seed"], row["crn"])
+        by_key.setdefault(key, {})[row["scheduler"]] = row["n_attempts"]
+    with_crn = [v for k, v in by_key.items() if k[3]]
+    # Same fates and same attempt counts per task -> same total attempts for both schedulers.
+    assert all(v["fifo"] == v["cp"] for v in with_crn)
+
+
+def test_summarize_crn(crn_rows):
+    summary = summarize_crn(crn_rows)
+    assert len(summary) == 2
+    for row in summary:
+        assert row["n_pairs_crn"] + row["n_dropped_crn"] == 4
+        assert row["n_pairs_indep"] + row["n_dropped_indep"] == 4
+        if row["var_ratio"] != "":
+            assert row["var_ratio_ci_low"] <= row["var_ratio"] <= row["var_ratio_ci_high"]
+            assert row["ci_width_crn"] == row["ci_high_crn"] - row["ci_low_crn"]
+
+
+def test_summarize_crn_hand_made():
+    def run(graph_seed, crn, scheduler, value, status="completed"):
+        return {"graph_family": "g", "graph_params": "{}", "failure_p": 0.1, "crn": crn,
+                "graph_seed": graph_seed, "sim_seed": 0, "scheduler": scheduler,
+                "status": status, "normalized_makespan": value}
+
+    rows = []
+    for seed, (d_crn, d_indep) in enumerate([(-0.1, -0.3), (-0.2, 0.1), (-0.3, -0.5)]):
+        rows += [run(seed, True, "fifo", 1.5), run(seed, True, "cp", 1.5 + d_crn),
+                 run(seed, False, "fifo", 1.5), run(seed, False, "cp", 1.5 + d_indep)]
+    rows += [run(3, True, "fifo", 1.5), run(3, True, "cp", 1.2, status="partial"),
+             run(3, False, "fifo", 1.5), run(3, False, "cp", 1.4)]
+    (row,) = summarize_crn(rows)
+    assert (row["n_pairs_crn"], row["n_dropped_crn"]) == (3, 1)
+    assert (row["n_pairs_indep"], row["n_dropped_indep"]) == (4, 0)
+    assert row["n_ratio_pairs"] == 3  # seed 3 is missing from the crn arm
+    # var(-0.1, -0.2, -0.3) = 0.01; var(-0.3, 0.1, -0.5) = 0.0933...; ratio 9.333...
+    assert row["var_ratio"] == pytest.approx(0.28 / 3 / 0.01)
+    assert row["mean_d_crn"] == pytest.approx(-0.2)
+
+
+def test_variance_ratio_zero_denominator():
+    assert variance_ratio([(1.0, 1.0), (1.0, 2.0)]) == float("inf")
+
+
+def test_cli_crn_smoke(scratch, capsys):
+    out = scratch / "a2"
+    args = ["ablation", "crn", "--out", str(out), "--graphs", str(E1_CONFIG),
+            "--graph-seeds", "2", "--sim-seeds", "1"]
+    assert main(args) == 0
+    assert "crn: 96 runs" in capsys.readouterr().out
+    summary = read_csv(out / "summary.csv")
+    assert len(summary) == 12  # 6 graph specs x 2 failure probabilities
+    assert list(summary[0])[-4:] == ["n_ratio_pairs", "var_ratio", "var_ratio_ci_low",
+                                     "var_ratio_ci_high"]
 
 
 def test_cli_ablation_errors(scratch, capsys):
