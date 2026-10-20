@@ -1,0 +1,142 @@
+{
+  "config": {
+    "failures": [
+      {
+        "p": 0.0
+      }
+    ],
+    "graph_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ],
+    "graphs": [
+      {
+        "durations": {
+          "dist": "uniform",
+          "high": 10,
+          "low": 1
+        },
+        "edge_prob": 0.2,
+        "family": "layered",
+        "n_layers": 10,
+        "n_tasks": 100
+      },
+      {
+        "durations": {
+          "dist": "lognormal",
+          "mu": 1.0,
+          "sigma": 1.0
+        },
+        "edge_prob": 0.2,
+        "family": "layered",
+        "n_layers": 10,
+        "n_tasks": 100
+      },
+      {
+        "durations": {
+          "dist": "uniform",
+          "high": 10,
+          "low": 1
+        },
+        "edge_prob": 0.05,
+        "family": "erdos_renyi",
+        "n_tasks": 100
+      },
+      {
+        "durations": {
+          "dist": "lognormal",
+          "mu": 1.0,
+          "sigma": 1.0
+        },
+        "edge_prob": 0.05,
+        "family": "erdos_renyi",
+        "n_tasks": 100
+      },
+      {
+        "durations": {
+          "dist": "uniform",
+          "high": 10,
+          "low": 1
+        },
+        "family": "fork_join",
+        "stages": 6,
+        "width": 8
+      },
+      {
+        "durations": {
+          "dist": "lognormal",
+          "mu": 1.0,
+          "sigma": 1.0
+        },
+        "family": "fork_join",
+        "stages": 6,
+        "width": 8
+      }
+    ],
+    "name": "e1_homogeneous",
+    "schedulers": [
+      "fifo",
+      "random",
+      "cp",
+      "heft"
+    ],
+    "sim_seeds": [
+      0
+    ],
+    "workers": [
+      {
+        "k": 2,
+        "speeds": "homogeneous"
+      },
+      {
+        "k": 4,
+        "speeds": "homogeneous"
+      },
+      {
+        "k": 8,
+        "speeds": "homogeneous"
+      },
+      {
+        "k": 16,
+        "speeds": "homogeneous"
+      }
+    ]
+  },
+  "dagsched_version": "0.1.0",
+  "git": {
+    "commit": "fe26dcb4744117dce4a48323a591e62ce6172dc3",
+    "dirty": false
+  },
+  "n_runs": 2880,
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python_version": "3.10.11",
+  "wall_time_s": 16.855399600000965
+}
