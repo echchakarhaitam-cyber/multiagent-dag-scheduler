@@ -12,6 +12,7 @@ from dagsched.simulator import (
     Worker,
     simulate,
 )
+from dagsched.validation import ScheduleViolation, validate_schedule
 
 __version__ = "0.1.0"
 
@@ -21,6 +22,7 @@ __all__ = [
     "FIFOScheduler",
     "GraphValidationError",
     "RandomScheduler",
+    "ScheduleViolation",
     "Scheduler",
     "SchedulerView",
     "SchedulingError",
@@ -31,4 +33,5 @@ __all__ = [
     "Worker",
     "__version__",
     "simulate",
+    "validate_schedule",
 ]
