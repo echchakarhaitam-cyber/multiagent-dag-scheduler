@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from helpers import make_run, write_runs
 
 from dagsched.experiments import (
     PAIRED_COLUMNS,
@@ -238,28 +239,6 @@ def test_summarize_smoke_groups(smoke_run, scratch):
     # Every non-baseline scheduler is paired with fifo on the 3 graph seeds of each group.
     assert {r["scheduler"] for r in paired} == {"cp", "heft", "random"}
     assert all(r["baseline"] == "fifo" and r["n_pairs"] == "3" for r in paired)
-
-
-def make_run(**overrides) -> dict:
-    """A runs.csv row with neutral defaults; only the fields under test vary."""
-    row = {column: "0" for column in RUN_COLUMNS}
-    row.update({
-        "experiment": "hand", "graph_family": "layered", "graph_params": "{}", "graph_seed": "0",
-        "k": "2", "speeds": "[1.0, 1.0]", "failure_p": "0.0", "max_attempts": "3",
-        "duplicate_prob": "0.0", "sim_seed": "0", "scheduler": "fifo", "status": "completed",
-        "normalized_makespan": "1.0", "utilization": "0.5", "wasted_work": "0.0",
-    })
-    row.update({key: str(value) for key, value in overrides.items()})
-    return row
-
-
-def write_runs(directory: Path, rows: list[dict]) -> Path:
-    path = directory / "runs.csv"
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=RUN_COLUMNS, lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
-    return path
 
 
 def test_paired_comparison_pairs_on_identical_keys(scratch):
