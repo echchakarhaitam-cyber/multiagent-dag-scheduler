@@ -3,6 +3,13 @@
 from dagsched.bounds import lower_bound
 from dagsched.collector import ResultCollector
 from dagsched.failures import BernoulliFailures, FailureModel, NoFailures, ScriptedFailures
+from dagsched.generators import (
+    DurationSpec,
+    erdos_renyi_dag,
+    fork_join,
+    graph_stats,
+    layered_dag,
+)
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
 from dagsched.retry import RetryPolicy
 from dagsched.schedulers import (
@@ -36,6 +43,7 @@ __all__ = [
     "BernoulliFailures",
     "CriticalPathScheduler",
     "CycleError",
+    "DurationSpec",
     "FIFOScheduler",
     "FailureModel",
     "GraphValidationError",
@@ -56,7 +64,11 @@ __all__ = [
     "TaskRecord",
     "Worker",
     "__version__",
+    "erdos_renyi_dag",
+    "fork_join",
     "get_scheduler",
+    "graph_stats",
+    "layered_dag",
     "lower_bound",
     "simulate",
     "validate_schedule",
