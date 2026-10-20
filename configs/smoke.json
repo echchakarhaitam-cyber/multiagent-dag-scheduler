@@ -1,0 +1,12 @@
+{
+  "name": "smoke",
+  "graphs": [{"family": "layered", "n_tasks": 30, "n_layers": 6, "edge_prob": 0.3,
+              "durations": {"dist": "uniform", "low": 1, "high": 10}}],
+  "graph_seeds": [0, 1, 2],
+  "workers": [{"k": 2, "speeds": "homogeneous"}, {"k": 4, "speeds": "homogeneous"}],
+  "schedulers": ["fifo", "random", "cp", "heft"],
+  "failures": [{"p": 0.0}, {"p": 0.2}],
+  "retry": {"max_attempts": 5, "backoff_base": 0.0, "backoff_factor": 2.0},
+  "duplicate_delivery_prob": 0.0,
+  "sim_seeds": [0]
+}
