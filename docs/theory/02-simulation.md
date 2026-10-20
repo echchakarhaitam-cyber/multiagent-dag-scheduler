@@ -64,4 +64,4 @@ With heterogeneous speeds the bound in this form does not apply. The simulator s
 speeds, but this milestone makes no claim about them.
 
 **Reference.** R. L. Graham, "Bounds on Multiprocessing Timing Anomalies",
-*SIAM Journal on Applied Mathematics* 17(2), 1969.
+*SIAM Journal on Applied Mathematics* 17(2), 1969. DOI 10.1137/0117039.
