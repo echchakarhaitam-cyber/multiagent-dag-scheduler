@@ -3,6 +3,7 @@
 from dagsched.bounds import lower_bound
 from dagsched.failures import BernoulliFailures, FailureModel, NoFailures, ScriptedFailures
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
+from dagsched.retry import RetryPolicy
 from dagsched.schedulers import (
     SCHEDULERS,
     CriticalPathScheduler,
@@ -37,6 +38,7 @@ __all__ = [
     "HEFTScheduler",
     "NoFailures",
     "RandomScheduler",
+    "RetryPolicy",
     "ScheduleViolation",
     "Scheduler",
     "SchedulerView",

@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from dagsched import BernoulliFailures, NoFailures, ScriptedFailures
+from dagsched import BernoulliFailures, NoFailures, RetryPolicy, ScriptedFailures
 from dagsched.failures import check_fail_fraction
 
 # ----- failure models ------------------------------------------------------------------------
@@ -105,3 +105,63 @@ def test_check_fail_fraction_accepts_valid(value):
 def test_check_fail_fraction_rejects_invalid(value):
     with pytest.raises(ValueError):
         check_fail_fraction(value)
+
+
+# ----- retry policy --------------------------------------------------------------------------
+
+
+def test_retry_defaults():
+    policy = RetryPolicy()
+    assert (policy.max_attempts, policy.backoff_base, policy.backoff_factor) == (3, 0.0, 2.0)
+    assert policy.next_ready_time(4.0, 1) == 4.0
+    assert policy.next_ready_time(4.0, 2) == 4.0
+    assert policy.next_ready_time(4.0, 3) is None
+
+
+def test_exponential_backoff_schedule():
+    policy = RetryPolicy(max_attempts=5, backoff_base=1.0, backoff_factor=2.0)
+    assert [policy.backoff(n) for n in (1, 2, 3, 4)] == [1, 2, 4, 8]
+    assert policy.next_ready_time(10.0, 1) == 11.0
+    assert policy.next_ready_time(10.0, 3) == 14.0
+    assert policy.next_ready_time(10.0, 5) is None
+
+
+def test_constant_backoff_with_factor_one():
+    policy = RetryPolicy(max_attempts=4, backoff_base=0.5, backoff_factor=1.0)
+    assert [policy.backoff(n) for n in (1, 2, 3)] == [0.5, 0.5, 0.5]
+
+
+def test_single_attempt_never_retries():
+    assert RetryPolicy(max_attempts=1).next_ready_time(0.0, 1) is None
+
+
+def test_zero_base_with_many_attempts_does_not_overflow():
+    assert RetryPolicy(max_attempts=10_000, backoff_factor=10.0).backoff(5_000) == 0.0
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_attempts": 0},
+        {"backoff_base": -1.0},
+        {"backoff_base": math.inf},
+        {"backoff_factor": 0.5},
+        {"backoff_factor": math.nan},
+    ],
+)
+def test_retry_rejects_bad_values(kwargs):
+    with pytest.raises(ValueError):
+        RetryPolicy(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"max_attempts": 2.0}, {"max_attempts": True}, {"backoff_base": "1"}]
+)
+def test_retry_rejects_bad_types(kwargs):
+    with pytest.raises(TypeError):
+        RetryPolicy(**kwargs)
+
+
+def test_backoff_rejects_attempt_zero():
+    with pytest.raises(ValueError, match="start at 1"):
+        RetryPolicy().backoff(0)
