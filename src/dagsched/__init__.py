@@ -2,7 +2,7 @@
 
 from dagsched.bounds import lower_bound
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
-from dagsched.schedulers import FIFOScheduler, RandomScheduler
+from dagsched.schedulers import CriticalPathScheduler, FIFOScheduler, RandomScheduler
 from dagsched.simulator import (
     Assignment,
     Scheduler,
@@ -19,6 +19,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "Assignment",
+    "CriticalPathScheduler",
     "CycleError",
     "FIFOScheduler",
     "GraphValidationError",

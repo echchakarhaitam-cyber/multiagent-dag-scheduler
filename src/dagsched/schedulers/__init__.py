@@ -1,5 +1,6 @@
 """Scheduling policies implementing the dagsched.simulator.Scheduler protocol."""
 
 from dagsched.schedulers.baselines import FIFOScheduler, RandomScheduler
+from dagsched.schedulers.critical_path import CriticalPathScheduler
 
-__all__ = ["FIFOScheduler", "RandomScheduler"]
+__all__ = ["CriticalPathScheduler", "FIFOScheduler", "RandomScheduler"]
