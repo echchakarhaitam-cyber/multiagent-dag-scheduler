@@ -1,6 +1,7 @@
 """dagsched: fault-tolerant scheduling of multi-agent task graphs."""
 
 from dagsched.bounds import lower_bound
+from dagsched.collector import ResultCollector
 from dagsched.failures import BernoulliFailures, FailureModel, NoFailures, ScriptedFailures
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
 from dagsched.retry import RetryPolicy
@@ -38,6 +39,7 @@ __all__ = [
     "HEFTScheduler",
     "NoFailures",
     "RandomScheduler",
+    "ResultCollector",
     "RetryPolicy",
     "ScheduleViolation",
     "Scheduler",
