@@ -1,6 +1,7 @@
 """dagsched: fault-tolerant scheduling of multi-agent task graphs."""
 
 from dagsched.bounds import lower_bound
+from dagsched.failures import BernoulliFailures, FailureModel, NoFailures, ScriptedFailures
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
 from dagsched.schedulers import (
     SCHEDULERS,
@@ -27,16 +28,20 @@ __version__ = "0.1.0"
 __all__ = [
     "SCHEDULERS",
     "Assignment",
+    "BernoulliFailures",
     "CriticalPathScheduler",
     "CycleError",
     "FIFOScheduler",
+    "FailureModel",
     "GraphValidationError",
     "HEFTScheduler",
+    "NoFailures",
     "RandomScheduler",
     "ScheduleViolation",
     "Scheduler",
     "SchedulerView",
     "SchedulingError",
+    "ScriptedFailures",
     "SimulationResult",
     "Task",
     "TaskGraph",
