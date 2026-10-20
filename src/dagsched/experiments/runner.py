@@ -132,7 +132,12 @@ def write_runs_csv(rows: list[dict[str, Any]], path: Path) -> None:
 
 
 def _git_info() -> dict[str, Any]:
-    """Commit hash and dirty flag of the repository containing this package, if any."""
+    """Commit hash and dirty flag of the repository containing this package, if any.
+
+    "dirty" means tracked files differ from the commit. Untracked files are ignored on
+    purpose: the outputs of earlier experiments are untracked until committed and say nothing
+    about the code that ran.
+    """
     where = Path(__file__).resolve().parent
     try:
         commit = subprocess.run(
@@ -140,7 +145,8 @@ def _git_info() -> dict[str, Any]:
             check=True, timeout=10,
         ).stdout.strip()
         status = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=where, capture_output=True, text=True,
+            ["git", "status", "--porcelain", "--untracked-files=no"], cwd=where,
+            capture_output=True, text=True,
             check=True, timeout=10,
         ).stdout
     except (OSError, subprocess.SubprocessError):
