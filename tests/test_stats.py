@@ -5,7 +5,14 @@ import statistics
 
 import pytest
 
-from dagsched.stats import bootstrap_ci, mean_std, paired_differences, sign_test, win_rate
+from dagsched.stats import (
+    bootstrap_ci,
+    holm_bonferroni,
+    mean_std,
+    paired_differences,
+    sign_test,
+    win_rate,
+)
 
 
 def test_mean_std_known_values():
@@ -77,6 +84,33 @@ def test_sign_test_drops_zeros():
 def test_sign_test_asymmetric_known_value():
     # 8 negative, 2 positive of 10: 2 * (C(10,0)+C(10,1)+C(10,2)) / 1024 = 2 * 56 / 1024.
     assert sign_test([-1] * 8 + [2] * 2) == 112 / 1024
+
+
+def test_holm_bonferroni_hand_computed():
+    # Sorted: 0.005 (x4 = 0.02), 0.01 (x3 = 0.03), 0.03 (x2 = 0.06), 0.04 (x1 = 0.04 -> running
+    # max 0.06). Back in input order: [0.03, 0.06, 0.06, 0.02].
+    adjusted = holm_bonferroni([0.01, 0.04, 0.03, 0.005])
+    assert adjusted == pytest.approx([0.03, 0.06, 0.06, 0.02])
+
+
+def test_holm_bonferroni_caps_at_one_and_is_monotone():
+    assert holm_bonferroni([0.5, 0.6]) == [1.0, 1.0]
+    raw = [0.2, 0.001, 0.04, 0.04, 0.9]
+    adjusted = holm_bonferroni(raw)
+    assert all(a >= r for a, r in zip(adjusted, raw))
+    by_raw = [a for _, a in sorted(zip(raw, adjusted))]
+    assert by_raw == sorted(by_raw)
+
+
+def test_holm_bonferroni_trivial_cases():
+    assert holm_bonferroni([]) == []
+    assert holm_bonferroni([0.03]) == [0.03]
+
+
+@pytest.mark.parametrize("bad", [[-0.1], [1.5], [True], ["0.1"]])
+def test_holm_bonferroni_rejects_invalid(bad):
+    with pytest.raises(ValueError):
+        holm_bonferroni(bad)
 
 
 def test_win_rate():

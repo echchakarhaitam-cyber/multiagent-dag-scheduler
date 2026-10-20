@@ -79,6 +79,28 @@ def sign_test(differences: Sequence[float]) -> float:
     return min(1.0, 2 * tail / 2**n)
 
 
+def holm_bonferroni(pvalues: Sequence[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values, returned in the input order.
+
+    Sort the m p-values ascending, multiply the i-th smallest (0-based) by (m - i), cap at 1,
+    and take the running maximum so the adjusted values are monotone in the raw ones.
+    Rejecting every hypothesis whose adjusted p-value is below alpha controls the family-wise
+    error rate at alpha, without any independence assumption (Holm, 1979).
+    """
+    values = list(pvalues)
+    for p in values:
+        if isinstance(p, bool) or not isinstance(p, (int, float)) or not 0.0 <= p <= 1.0:
+            raise ValueError(f"p-values must be numbers in [0, 1], got {p!r}")
+    m = len(values)
+    order = sorted(range(m), key=lambda i: values[i])  # stable: ties keep input order
+    adjusted = [0.0] * m
+    running = 0.0
+    for rank, index in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * values[index]))
+        adjusted[index] = running
+    return adjusted
+
+
 def win_rate(differences: Sequence[float]) -> float:
     """Fraction of strictly negative differences (a lower makespan is a win)."""
     data = _non_empty(differences, "differences")

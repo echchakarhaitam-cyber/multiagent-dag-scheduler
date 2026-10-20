@@ -27,6 +27,7 @@ from dagsched.experiments import (
 )
 from dagsched.experiments import runner as runner_module
 from dagsched.experiments.__main__ import main
+from dagsched.stats import holm_bonferroni
 from dagsched.validation import ScheduleViolation
 
 SMOKE_PATH = Path(__file__).resolve().parents[1] / "configs" / "smoke.json"
@@ -287,6 +288,19 @@ def test_paired_comparison_pairs_on_identical_keys(scratch):
     # The p = 0.5 cp run has no fifo run on its instance: listed with no pairs.
     other = next(r for r in paired if r["failure_p"] == 0.5)
     assert other["n_pairs"] == 0 and other["mean_difference"] == ""
+    # Only one real test in this file, so Holm leaves it unchanged; no pairs -> blank.
+    assert result["p_holm"] == result["sign_test_p"]
+    assert other["p_holm"] == ""
+
+
+def test_p_holm_adjusts_over_all_comparisons(smoke_run, scratch):
+    out, _ = smoke_run
+    (scratch / "runs.csv").write_bytes((out / "runs.csv").read_bytes())
+    summarize_directory(scratch)
+    paired = read_csv(scratch / "paired.csv")
+    raw = [float(row["sign_test_p"]) for row in paired]
+    assert [float(row["p_holm"]) for row in paired] == pytest.approx(holm_bonferroni(raw))
+    assert all(float(r["p_holm"]) >= float(r["sign_test_p"]) for r in paired)
 
 
 def test_summary_uses_completed_runs_for_makespan(scratch):

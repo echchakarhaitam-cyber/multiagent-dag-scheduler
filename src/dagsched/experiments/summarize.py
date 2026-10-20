@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dagsched.stats import bootstrap_ci, mean_std, sign_test, win_rate
+from dagsched.stats import bootstrap_ci, holm_bonferroni, mean_std, sign_test, win_rate
 
 SUMMARY_COLUMNS = (
     "graph_family", "graph_params", "k", "speeds_kind", "failure_p", "scheduler", "count",
@@ -28,7 +28,7 @@ SUMMARY_COLUMNS = (
 )
 PAIRED_COLUMNS = (
     "graph_family", "graph_params", "k", "speeds_kind", "failure_p", "scheduler", "baseline",
-    "n_pairs", "mean_difference", "ci_low", "ci_high", "win_rate", "sign_test_p",
+    "n_pairs", "mean_difference", "ci_low", "ci_high", "win_rate", "sign_test_p", "p_holm",
 )
 _REQUIRED = (
     "graph_family", "graph_params", "graph_seed", "k", "speeds", "failure_p", "max_attempts",
@@ -185,8 +185,18 @@ def paired_comparisons(runs: Iterable[Run], baseline: str = "fifo") -> list[dict
             "ci_high": stats["ci_high"],
             "win_rate": win_rate(values) if values else "",
             "sign_test_p": sign_test(values),
+            "p_holm": "",
         })
+    _add_holm(rows)
     return rows
+
+
+def _add_holm(rows: list[dict[str, Any]]) -> None:
+    """Holm-adjust the sign-test p-values over all comparisons passed in together (one
+    experiment's runs.csv). Rows without pairs are not tests and are left blank."""
+    tested = [row for row in rows if row["n_pairs"] > 0]
+    for row, adjusted in zip(tested, holm_bonferroni([row["sign_test_p"] for row in tested])):
+        row["p_holm"] = adjusted
 
 
 def _write(rows: list[dict[str, Any]], columns: tuple[str, ...], path: Path) -> None:

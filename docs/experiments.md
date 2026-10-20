@@ -77,4 +77,8 @@ effect size. The mean difference and its CI cover that.
 ## Caveats
 - With few instances per group, bootstrap intervals are crude and the sign test has little
   power. The smoke config (3 graph seeds) is a pipeline check, not an experiment.
-- Many groups are compared at once; the p-values are not corrected for multiple testing.
+- Many groups are compared at once. `paired.csv` therefore also has `p_holm`: the sign-test
+  p-values Holm–Bonferroni-adjusted over **all comparisons of one experiment** (every row of
+  that experiment's `paired.csv` with at least one pair). Rows without pairs are not tests and
+  get a blank. Adjusted p < 0.05 controls the family-wise error rate at 5% within that
+  experiment, but not across experiments.
