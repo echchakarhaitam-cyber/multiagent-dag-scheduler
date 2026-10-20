@@ -7,6 +7,7 @@ from collections import Counter
 import pytest
 
 from dagsched import (
+    SCHEDULERS,
     AttemptRecord,
     BernoulliFailures,
     FIFOScheduler,
@@ -20,6 +21,7 @@ from dagsched import (
     TaskGraph,
     TaskRecord,
     get_scheduler,
+    lower_bound,
     simulate,
     validate_schedule,
 )
@@ -390,6 +392,57 @@ def test_simulation_config_validation(kwargs, error):
 def test_simulate_rejects_non_config(worked, make_workers):
     with pytest.raises(TypeError, match="SimulationConfig"):
         simulate(worked, make_workers(1), FIFOScheduler(), config={"retry": None})
+
+
+# ----- validation of the hand-computed cases -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("failures", "retry"),
+    [
+        ({("A", 1): 0.5}, RetryPolicy(backoff_base=0)),
+        ({("A", 1): 0.5}, RetryPolicy(backoff_base=1, backoff_factor=2)),
+        ({("C", 1): 0.5}, RetryPolicy(max_attempts=1)),
+    ],
+    ids=["a", "b", "c"],
+)
+def test_hand_computed_cases_validate(worked, make_workers, failures, retry):
+    workers = make_workers(1)
+    result = fifo_run(worked, workers, failure_model=ScriptedFailures(failures), retry=retry)
+    validate_schedule(worked, workers, result, max_attempts=retry.max_attempts)
+
+
+def test_case_d_validates(worked, make_workers):
+    workers = make_workers(1)
+    result = fifo_run(
+        worked, workers, failure_model=BernoulliFailures(1.0), retry=RetryPolicy(max_attempts=3)
+    )
+    validate_schedule(worked, workers, result, max_attempts=3)
+
+
+# ----- randomized ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(SCHEDULERS))
+@pytest.mark.parametrize("p", [0.1, 0.3])
+@pytest.mark.parametrize("k", [2, 4])
+def test_random_dags_with_failures(random_dags, make_workers, name, p, k):
+    workers = make_workers(k)
+    config = SimulationConfig(
+        failure_model=BernoulliFailures(p),
+        retry=RetryPolicy(max_attempts=5),
+        duplicate_delivery_prob=0.2,  # idempotent collection must make these harmless
+        duplicate_delay=0.5,
+    )
+    for index, graph in enumerate(random_dags):
+        result = simulate(graph, workers, get_scheduler(name), seed=index, config=config)
+        validate_schedule(graph, workers, result, max_attempts=5)
+        if result.status == "completed":
+            assert result.makespan >= lower_bound(graph, workers) - 1e-9
+        assert len(result.attempts) >= len(result.records)
+        assert result.wasted_work >= 0
+        again = simulate(graph, workers, get_scheduler(name), seed=index, config=config)
+        assert again == result, f"graph {index}: not deterministic"
 
 
 # ----- common random numbers -----------------------------------------------------------------
