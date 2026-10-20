@@ -5,6 +5,7 @@ import pytest
 from dagsched import (
     CriticalPathScheduler,
     FIFOScheduler,
+    HEFTScheduler,
     Task,
     TaskGraph,
     TaskRecord,
@@ -100,3 +101,65 @@ def test_cp_highest_level_goes_to_fastest_worker():
 def test_cp_select_before_reset_fails():
     with pytest.raises(RuntimeError, match="reset"):
         CriticalPathScheduler().select(None)  # type: ignore[arg-type]
+
+
+# ----- HEFT ----------------------------------------------------------------------------------
+
+
+def test_heft_ranks_equal_bottom_levels_for_unit_speeds(worked, make_workers):
+    scheduler = HEFTScheduler()
+    simulate(worked, make_workers(2), scheduler)
+    assert scheduler.upward_ranks() == worked.bottom_levels()
+
+
+def test_heft_ranks_use_mean_inverse_speed(worked):
+    # mean(1/2, 1/0.5) = 1.25, so every rank is 1.25 x the bottom level.
+    scheduler = HEFTScheduler()
+    simulate(worked, [Worker("fast", 2.0), Worker("slow", 0.5)], scheduler)
+    expected = {task_id: 1.25 * level for task_id, level in worked.bottom_levels().items()}
+    assert scheduler.upward_ranks() == pytest.approx(expected)
+
+
+def test_heft_hidden_chain_is_optimal(hidden_chain, make_workers):
+    result = simulate(hidden_chain, make_workers(2), HEFTScheduler())
+    assert result.makespan == 6
+
+
+def test_heft_waits_for_fast_worker(fast_and_slow):
+    graph, workers = fast_and_slow
+    result = simulate(graph, workers, HEFTScheduler())
+    assert result.records == (TaskRecord("t1", "fast", 0, 2), TaskRecord("t2", "fast", 2, 4))
+    assert result.makespan == 4
+    assert result.worker_busy["slow"] == 0
+    assert lower_bound(graph, workers) == 3.2
+
+
+def test_heft_worked_example_two_workers(worked, make_workers):
+    assert simulate(worked, make_workers(2), HEFTScheduler()).makespan == 10
+
+
+def test_heft_equal_finish_time_smallest_worker_id():
+    graph = TaskGraph([Task("only", 1)])
+    result = simulate(graph, [Worker("w2"), Worker("w1")], HEFTScheduler())
+    assert result.records[0].worker_id == "w1"
+
+
+def test_heft_equal_rank_smallest_task_id_first():
+    graph = TaskGraph([Task("q", 2), Task("p", 2)])
+    result = simulate(graph, [Worker("W0")], HEFTScheduler())
+    assert [r.task_id for r in result.records] == ["p", "q"]
+
+
+def test_heft_reservation_steers_later_task_in_same_decision():
+    # Ranks: x = 4 x mean(1/2, 1/1) = 3, w = 2.25, so x goes first and takes "fast" (EFT 2).
+    # For w, the reserved fast worker would finish at
+    # 2 + 1.5 = 3.5 and slow at 3, so w goes to slow now instead of waiting.
+    graph = TaskGraph([Task("x", 4), Task("w", 3)])
+    workers = [Worker("fast", 2.0), Worker("slow", 1.0)]
+    result = simulate(graph, workers, HEFTScheduler())
+    assert result.records == (TaskRecord("w", "slow", 0, 3), TaskRecord("x", "fast", 0, 2))
+
+
+def test_heft_select_before_reset_fails():
+    with pytest.raises(RuntimeError, match="reset"):
+        HEFTScheduler().select(None)  # type: ignore[arg-type]

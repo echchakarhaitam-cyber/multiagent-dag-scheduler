@@ -2,7 +2,12 @@
 
 from dagsched.bounds import lower_bound
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
-from dagsched.schedulers import CriticalPathScheduler, FIFOScheduler, RandomScheduler
+from dagsched.schedulers import (
+    CriticalPathScheduler,
+    FIFOScheduler,
+    HEFTScheduler,
+    RandomScheduler,
+)
 from dagsched.simulator import (
     Assignment,
     Scheduler,
@@ -23,6 +28,7 @@ __all__ = [
     "CycleError",
     "FIFOScheduler",
     "GraphValidationError",
+    "HEFTScheduler",
     "RandomScheduler",
     "ScheduleViolation",
     "Scheduler",
