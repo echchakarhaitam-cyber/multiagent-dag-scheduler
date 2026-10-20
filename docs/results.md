@@ -136,6 +136,34 @@ Source: `results/e1/paired.csv`
   graphs the values for k = 2 (fifo 1.196, cp 1.148 with uniform durations) stay well above 1
   for every scheduler.
 
+### How tight is the lower bound on fork–join graphs with small k?
+
+The fork–join rows with k ∈ {2, 4} have the largest normalized makespans in E1 for every
+scheduler. Part of that value may come from the bound rather than the schedules, so this
+table records which term of LB = max(W/k, CP) is binding in those runs:
+
+<!-- BEGIN GENERATED: e1_bound_terms -->
+Source: `results/checks.json`, computed by `scripts/check_results.py` from `results/e1/runs.csv`
+
+| k | durations | runs | LB = W/k (work term) | LB = CP (path term) |
+|---|---|---|---|---|
+| 2 | lognormal | 120 | 0.767 | 0.233 |
+| 2 | uniform | 120 | 1.000 | 0.000 |
+| 4 | lognormal | 120 | 0.000 | 1.000 |
+| 4 | uniform | 120 | 0.000 | 1.000 |
+<!-- END GENERATED: e1_bound_terms -->
+
+- At k = 4 the bound is the critical-path length in every run. The values 1.316 (fifo) and
+  1.189 (cp/heft, uniform durations) therefore measure the makespan against CP alone. At
+  k = 2 the work term binds in every run with uniform durations, and in most runs with
+  lognormal durations.
+- *Hypothesis (not tested here).* Each fork–join stage has 8 parallel branches followed by a
+  join. With k = 4 a stage needs at least two rounds of branches, but CP counts only the
+  longest branch per stage, and W/k spreads the work as if stages could overlap. A per-stage
+  bound such as Σ over stages of max(longest branch, stage work / k), plus the joins, could be
+  noticeably tighter. If so, part of the 1.19–1.32 gap would be looseness of the bound rather
+  than scheduler inefficiency. This bound was not implemented or measured (NOT MEASURED).
+
 ## RQ2: heterogeneous workers (E2)
 
 Does HEFT's earliest-finish-time placement beat cp and the baselines when speeds differ?

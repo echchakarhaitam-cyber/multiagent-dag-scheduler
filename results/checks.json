@@ -1,4 +1,42 @@
 {
+  "e1_fork_join_bound_terms": [
+    {
+      "dist": "lognormal",
+      "fraction_path": 0.23333333333333334,
+      "fraction_work": 0.7666666666666667,
+      "k": 2,
+      "path_term": 28,
+      "runs": 120,
+      "work_term": 92
+    },
+    {
+      "dist": "uniform",
+      "fraction_path": 0.0,
+      "fraction_work": 1.0,
+      "k": 2,
+      "path_term": 0,
+      "runs": 120,
+      "work_term": 120
+    },
+    {
+      "dist": "lognormal",
+      "fraction_path": 1.0,
+      "fraction_work": 0.0,
+      "k": 4,
+      "path_term": 120,
+      "runs": 120,
+      "work_term": 0
+    },
+    {
+      "dist": "uniform",
+      "fraction_path": 1.0,
+      "fraction_work": 0.0,
+      "k": 4,
+      "path_term": 120,
+      "runs": 120,
+      "work_term": 0
+    }
+  ],
   "e3_completion": {
     "groups": 1800,
     "violations": 0

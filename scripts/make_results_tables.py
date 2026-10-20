@@ -180,6 +180,15 @@ def block_survivorship(results: Path) -> str:
             f"schedulers completed: {completion['violations']} of {completion['groups']}.")
 
 
+def block_bound_terms(results: Path) -> str:
+    rows = _checks(results)["e1_fork_join_bound_terms"]
+    body = [[str(r["k"]), r["dist"], str(r["runs"]), f"{r['fraction_work']:.3f}",
+             f"{r['fraction_path']:.3f}"] for r in rows]
+    table = markdown_table(
+        ["k", "durations", "runs", "LB = W/k (work term)", "LB = CP (path term)"], body)
+    return f"{_checks_source(results, 'e1')}\n\n{table}"
+
+
 _GRAPH_KEYS = ("graph_family", "dist", "k")
 _FAILURE_KEYS = ("speeds_kind", "graph_family", "dist", "failure_p")
 BLOCKS: dict[str, Callable[[Path], str]] = {
@@ -196,6 +205,7 @@ BLOCKS: dict[str, Callable[[Path], str]] = {
     "e3_makespan": lambda r: block_makespan(r, "e3", _FAILURE_KEYS),
     "e3_reliability": lambda r: block_reliability(r, "e3", _FAILURE_KEYS),
     "e3_survivorship": block_survivorship,
+    "e1_bound_terms": block_bound_terms,
     "e3_paired": lambda r: block_paired(r, "e3", _FAILURE_KEYS),
 }
 

@@ -104,6 +104,31 @@ def test_check_results_detects_scheduler_dependent_completion(scratch, capsys):
         in capsys.readouterr().out
 
 
+def test_bound_terms_classifies_binding_term(scratch):
+    rows = [
+        # k=2: W/k = 20/2 = 10 > CP 8 -> work term.
+        make_run(graph_family="fork_join", k=2, lower_bound=10, total_work=20, critical_length=8),
+        # k=4: W/k = 5 < CP 9 -> path term.
+        make_run(graph_family="fork_join", k=4, lower_bound=9, total_work=20, critical_length=9),
+        make_run(graph_family="fork_join", k=4, graph_seed=1, lower_bound=9, total_work=36,
+                 critical_length=9),  # exact tie: counts for both
+        make_run(graph_family="fork_join", k=8, lower_bound=9, total_work=20, critical_length=9),
+        make_run(graph_family="layered", k=2, lower_bound=10, total_work=20, critical_length=8),
+    ]
+    path = write_runs(scratch / "e1", rows)
+    terms = check_results.bound_terms(check_results._read_raw(path))
+    assert [(t["k"], t["runs"], t["work_term"], t["path_term"]) for t in terms] == [
+        (2, 1, 1, 0), (4, 2, 1, 2)]
+    assert terms[1]["fraction_path"] == 1.0 and terms[1]["fraction_work"] == 0.5
+
+
+def test_bound_terms_block(scratch):
+    healthy_results(scratch)
+    assert check_results.main(["--results", str(scratch)]) == 0
+    block = tables.block_bound_terms(scratch)
+    assert "| k | durations | runs | LB = W/k (work term) | LB = CP (path term) |" in block
+
+
 def test_survivorship_block_needs_checks_file(scratch):
     with pytest.raises(tables.TableError, match="run scripts/check_results.py first"):
         tables.block_survivorship(scratch)
