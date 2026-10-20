@@ -78,10 +78,11 @@ def _schedulers(rows: list[dict[str, Any]]) -> list[str]:
 
 def _finish(fig: Any, axes: Any, path: Path, title: str) -> Path:
     handles, labels = axes.flat[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=len(labels), title="scheduler",
-               bbox_to_anchor=(0.5, 1.0))
-    fig.suptitle(title, y=1.06)
+    fig.suptitle(title)
     fig.tight_layout()
+    # Below the panels, so it can never cover a panel title.
+    fig.legend(handles, labels, loc="upper center", ncol=len(labels), title="scheduler",
+               bbox_to_anchor=(0.5, 0.0))
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=DPI, bbox_inches="tight")
     return path
