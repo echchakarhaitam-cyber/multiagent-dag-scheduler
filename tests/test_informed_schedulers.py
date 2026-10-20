@@ -1,8 +1,11 @@
 """Tests for the informed schedulers. Expected schedules were computed by hand."""
 
+import random
+
 import pytest
 
 from dagsched import (
+    SCHEDULERS,
     CriticalPathScheduler,
     FIFOScheduler,
     HEFTScheduler,
@@ -10,8 +13,10 @@ from dagsched import (
     TaskGraph,
     TaskRecord,
     Worker,
+    get_scheduler,
     lower_bound,
     simulate,
+    validate_schedule,
 )
 
 
@@ -163,3 +168,72 @@ def test_heft_reservation_steers_later_task_in_same_decision():
 def test_heft_select_before_reset_fails():
     with pytest.raises(RuntimeError, match="reset"):
         HEFTScheduler().select(None)  # type: ignore[arg-type]
+
+
+# ----- registry ------------------------------------------------------------------------------
+
+ALL_NAMES = sorted(SCHEDULERS)
+
+
+def test_registry_contains_expected_names():
+    assert set(SCHEDULERS) == {"fifo", "random", "cp", "heft"}
+
+
+@pytest.mark.parametrize("name", ALL_NAMES)
+def test_get_scheduler_builds_fresh_instances(name):
+    first, second = get_scheduler(name), get_scheduler(name)
+    assert first is not second
+    assert first.name == name
+
+
+def test_get_scheduler_unknown_name_lists_valid_names():
+    with pytest.raises(KeyError, match="valid names: \\['cp', 'fifo', 'heft', 'random'\\]"):
+        get_scheduler("nope")
+
+
+# ----- randomized comparisons ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ALL_NAMES)
+@pytest.mark.parametrize("k", [1, 2, 4, 8])
+def test_homogeneous_random_dags_valid_and_within_bounds(random_dags, make_workers, name, k):
+    # Graham's bound needs a work-conserving policy. FIFO, Random and CP start
+    # min(#ready, #idle) tasks by construction. HEFT does too when all speeds are equal: its EFT
+    # max(now, avail[w]) + d/s is then minimized by the smallest avail[w]. A free idle worker
+    # has avail == now, while a running worker ends strictly after now (completions at `now`
+    # were applied before the decision) and a worker taken or reserved in this decision ends at
+    # >= now + d > now. So while a free idle worker exists, every ready task's best worker is
+    # one, and HEFT never holds a task back.
+    workers = make_workers(k)
+    for index, graph in enumerate(random_dags):
+        result = simulate(graph, workers, get_scheduler(name), seed=index)
+        validate_schedule(graph, workers, result)
+        assert lower_bound(graph, workers) == graph.makespan_lower_bound(k)
+        assert result.makespan >= lower_bound(graph, workers) - 1e-9
+        critical_length, _ = graph.critical_path()
+        graham = graph.total_work() / k + (1 - 1 / k) * critical_length
+        assert result.makespan <= graham + 1e-9, f"graph {index}: Graham bound violated"
+
+
+def heterogeneous_workers(seed: int, k: int) -> tuple[Worker, ...]:
+    rng = random.Random(seed)
+    return tuple(Worker(f"W{i}", rng.uniform(0.5, 2.0)) for i in range(k))
+
+
+@pytest.mark.parametrize("name", ALL_NAMES)
+@pytest.mark.parametrize("k", [2, 4])
+def test_heterogeneous_random_dags_valid_and_above_lower_bound(random_dags, name, k):
+    for index, graph in enumerate(random_dags):
+        workers = heterogeneous_workers(1000 + index, k)
+        result = simulate(graph, workers, get_scheduler(name), seed=index)
+        validate_schedule(graph, workers, result)
+        assert result.makespan >= lower_bound(graph, workers) - 1e-9
+
+
+@pytest.mark.parametrize("name", ALL_NAMES)
+def test_same_seed_gives_identical_result(random_dags, name):
+    for index, graph in enumerate(random_dags[:10]):
+        workers = heterogeneous_workers(index, 3)
+        first = simulate(graph, workers, get_scheduler(name), seed=index)
+        second = simulate(graph, workers, get_scheduler(name), seed=index)
+        assert first == second

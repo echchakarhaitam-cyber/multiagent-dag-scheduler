@@ -1,17 +1,16 @@
-"""Tests for the independent schedule validator, plus randomized bound checks on the baselines."""
+"""Tests for the independent schedule validator.
+
+Randomized validity and bound checks over all schedulers live in test_informed_schedulers.py.
+"""
 
 import dataclasses
-import random
 
 import pytest
 
 from dagsched import (
     FIFOScheduler,
-    RandomScheduler,
     ScheduleViolation,
     SimulationResult,
-    Task,
-    TaskGraph,
     simulate,
     validate_schedule,
 )
@@ -88,34 +87,3 @@ def test_speed_is_taken_into_account(worked, make_workers):
     validate_schedule(worked, fast, result)
     with pytest.raises(ScheduleViolation, match="duration"):
         validate_schedule(worked, make_workers(1), result)  # same ids, speed 1
-
-
-# ----- randomized checks ---------------------------------------------------------------------
-
-
-def random_dag(rng: random.Random) -> TaskGraph:
-    """20-40 tasks, edges only from lower to higher index (hence acyclic), durations in [1, 10]."""
-    n = rng.randint(20, 40)
-    density = rng.uniform(0.05, 0.3)
-    ids = [f"t{i:02d}" for i in range(n)]
-    tasks = [
-        Task(ids[i], rng.uniform(1, 10), tuple(ids[j] for j in range(i) if rng.random() < density))
-        for i in range(n)
-    ]
-    return TaskGraph(tasks)
-
-
-RANDOM_GRAPHS = [random_dag(random.Random(seed)) for seed in range(50)]
-
-
-@pytest.mark.parametrize("make_scheduler", [FIFOScheduler, RandomScheduler])
-@pytest.mark.parametrize("k", [1, 2, 4, 8])
-def test_random_dags_valid_and_within_bounds(make_workers, make_scheduler, k):
-    workers = make_workers(k)
-    for index, graph in enumerate(RANDOM_GRAPHS):
-        result = simulate(graph, workers, make_scheduler(), seed=index)
-        validate_schedule(graph, workers, result)
-        critical_length, _ = graph.critical_path()
-        assert result.makespan >= graph.makespan_lower_bound(k) - 1e-9
-        graham = graph.total_work() / k + (1 - 1 / k) * critical_length
-        assert result.makespan <= graham + 1e-9, f"graph {index}: Graham bound violated"

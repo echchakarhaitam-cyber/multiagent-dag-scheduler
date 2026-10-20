@@ -1,11 +1,12 @@
 """Shared fixtures. The worked example's expected values are computed by hand in the tests."""
 
 import copy
+import random
 from collections.abc import Callable
 
 import pytest
 
-from dagsched import TaskGraph, Worker
+from dagsched import Task, TaskGraph, Worker
 
 # A(2) ; B(3) deps A ; C(1) deps A ; D(4) deps B,C ; E(2) deps C ; F(1) deps D,E
 WORKED_EXAMPLE = {
@@ -37,3 +38,21 @@ def make_workers() -> Callable[..., tuple[Worker, ...]]:
         return tuple(Worker(f"W{i}", speed) for i in range(k))
 
     return make
+
+
+def random_dag(rng: random.Random) -> TaskGraph:
+    """20-40 tasks, edges only from lower to higher index (hence acyclic), durations in [1, 10]."""
+    n = rng.randint(20, 40)
+    density = rng.uniform(0.05, 0.3)
+    ids = [f"t{i:02d}" for i in range(n)]
+    tasks = [
+        Task(ids[i], rng.uniform(1, 10), tuple(ids[j] for j in range(i) if rng.random() < density))
+        for i in range(n)
+    ]
+    return TaskGraph(tasks)
+
+
+@pytest.fixture(scope="session")
+def random_dags() -> list[TaskGraph]:
+    """50 reproducible random DAGs (seeds 0..49). Graphs are immutable, so sharing is safe."""
+    return [random_dag(random.Random(seed)) for seed in range(50)]
