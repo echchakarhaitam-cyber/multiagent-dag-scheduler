@@ -189,6 +189,69 @@ def block_bound_terms(results: Path) -> str:
     return f"{_checks_source(results, 'e1')}\n\n{table}"
 
 
+def _read_plain_csv(path: Path) -> list[dict[str, str]]:
+    if not path.is_file():
+        raise TableError(f"missing {path}")
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def block_ablation_setup(results: Path, ablation: str) -> str:
+    meta_path = results / ablation / "metadata.json"
+    if not meta_path.is_file():
+        raise TableError(f"missing {meta_path}")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    return (f"- Command: `python -m dagsched.experiments ablation {meta['ablation']} --out "
+            f"results/{ablation}`; {meta['n_runs']} runs; wall time {meta['wall_time_s']:.1f} s; "
+            f"commit `{meta['git']['commit'][:7]}` (dirty: {meta['git']['dirty']}).\n"
+            f"- {_source(results, ablation, 'metadata.json')}")
+
+
+def block_idempotency(results: Path) -> str:
+    rows = _read_plain_csv(results / "a1" / "summary.csv")
+    schedulers = [s for s in SCHEDULERS if any(r["scheduler"] == s for r in rows)]
+    groups: dict[tuple[str, str], dict[str, dict[str, str]]] = {}
+    for row in rows:
+        groups.setdefault((row["duplicate_prob"], row["idempotent"]), {})[row["scheduler"]] = row
+
+    def cell(r: dict[str, str]) -> str:
+        return (f"{float(r['invalid_fraction']):.3f} [{float(r['ci_low']):.3f}, "
+                f"{float(r['ci_high']):.3f}] ({r['n_invalid']}/{r['n_runs']}; "
+                f"precedence {r['n_precedence']}, overlap {r['n_overlap']}, other {r['n_other']})")
+
+    body = [[q, "idempotent" if idem == "True" else "naive",
+             f"{float(next(iter(by.values()))['mean_duplicates_received']):.2f}"]
+            + [cell(by[s]) for s in schedulers]
+            for (q, idem), by in groups.items()]
+    header = ["q", "collection", "mean duplicates per run"] + schedulers
+    return _source(results, "a1", "summary.csv") + "\n\n" + markdown_table(header, body)
+
+
+def block_crn(results: Path) -> str:
+    rows = _read_plain_csv(results / "a2" / "summary.csv")
+    rows.sort(key=lambda r: (FAMILIES.index(r["graph_family"]),
+                             DISTRIBUTIONS.index(json.loads(r["graph_params"])["durations"]["dist"]),
+                             float(r["failure_p"])))
+
+    def arm(r: dict[str, str], name: str) -> str:
+        return (f"{float(r[f'mean_d_{name}']):+.3f} [{float(r[f'ci_low_{name}']):+.3f}, "
+                f"{float(r[f'ci_high_{name}']):+.3f}]; sd {float(r[f'std_d_{name}']):.3f}; "
+                f"width {float(r[f'ci_width_{name}']):.3f}")
+
+    body = [[r["graph_family"], json.loads(r["graph_params"])["durations"]["dist"],
+             r["failure_p"],
+             (f"{r['n_pairs_crn']} ({r['n_dropped_crn']}) / {r['n_pairs_indep']} "
+              f"({r['n_dropped_indep']})"),
+             arm(r, "crn"), arm(r, "indep"),
+             (f"{float(r['var_ratio']):.2f} [{float(r['var_ratio_ci_low']):.2f}, "
+              f"{float(r['var_ratio_ci_high']):.2f}]")]
+            for r in rows]
+    header = ["graph", "durations", "p", "pairs (dropped) CRN / indep.",
+              "d with CRN: mean [CI]; sd; CI width", "d independent: mean [CI]; sd; CI width",
+              "var ratio indep./CRN [CI]"]
+    return _source(results, "a2", "summary.csv") + "\n\n" + markdown_table(header, body)
+
+
 _GRAPH_KEYS = ("graph_family", "dist", "k")
 _FAILURE_KEYS = ("speeds_kind", "graph_family", "dist", "failure_p")
 BLOCKS: dict[str, Callable[[Path], str]] = {
@@ -206,6 +269,10 @@ BLOCKS: dict[str, Callable[[Path], str]] = {
     "e3_reliability": lambda r: block_reliability(r, "e3", _FAILURE_KEYS),
     "e3_survivorship": block_survivorship,
     "e1_bound_terms": block_bound_terms,
+    "setup_a1": lambda r: block_ablation_setup(r, "a1"),
+    "setup_a2": lambda r: block_ablation_setup(r, "a2"),
+    "a1_idempotency": block_idempotency,
+    "a2_crn": block_crn,
     "e3_paired": lambda r: block_paired(r, "e3", _FAILURE_KEYS),
 }
 

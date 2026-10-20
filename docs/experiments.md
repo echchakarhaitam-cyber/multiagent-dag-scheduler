@@ -10,7 +10,17 @@ python -m dagsched.experiments summarize results/smoke            # --baseline f
 ```
 `run` writes `runs.csv` (one row per simulation) and `metadata.json` (config, git commit and
 dirty flag, Python version, platform, dagsched version, number of runs, wall time).
-`summarize` writes `summary.csv` and `paired.csv`. `runs.csv` holds no wall-clock values, so
+`summarize` writes `summary.csv` and `paired.csv` (`--baseline`, `--paired-out` for other
+baselines). Two ablations use the E1 graph specs (`--graphs` to change, `--graph-seeds` and
+`--sim-seeds` to shrink them):
+```
+python -m dagsched.experiments ablation idempotency --out results/a1   # RQ4
+python -m dagsched.experiments ablation crn --out results/a2           # RQ5
+```
+`idempotency` records validity per run instead of aborting, and exits 1 if the idempotent
+collector ever yields an invalid run. `crn` compares paired differences with and without
+`SimulationConfig(common_random_numbers=...)`. Both write `runs.csv`, `summary.csv` and
+`metadata.json`. `runs.csv` holds no wall-clock values, so
 rerunning a config reproduces it byte for byte. Configs are strict JSON: unknown keys and
 missing fields are errors.
 

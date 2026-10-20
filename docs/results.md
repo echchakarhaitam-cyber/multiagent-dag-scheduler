@@ -14,7 +14,9 @@ python -m dagsched.experiments run configs/e2_heterogeneous.json --out results/e
 python -m dagsched.experiments run configs/e3_failures.json --out results/e3
 python -m dagsched.experiments summarize results/eX           # for X = 1, 2, 3
 python -m dagsched.experiments plot results/eX --out docs/figures
-python scripts/check_results.py
+python -m dagsched.experiments ablation idempotency --out results/a1
+python -m dagsched.experiments ablation crn --out results/a2
+python scripts/check_results.py           # also writes results/checks.json
 python scripts/make_results_tables.py
 ```
 
@@ -587,6 +589,113 @@ Source: `results/e3/paired_vs_cp.csv`
   qualifies.
 - random vs fifo: the only significant difference in E3 is homogeneous, fork–join,
   lognormal, p = 0.3, where random is worse (+0.020, p_H 0.039).
+
+## RQ4: is idempotent result collection necessary? (ablation A1)
+
+<!-- BEGIN GENERATED: setup_a1 -->
+- Command: `python -m dagsched.experiments ablation idempotency --out results/a1`; 2880 runs; wall time 21.5 s; commit `6c01d38` (dirty: False).
+- Source: `results/a1/metadata.json`
+<!-- END GENERATED: setup_a1 -->
+- Graphs: the 6 E1 graph specifications, graph seeds 0–29. Workers: k = 4, speed 1. No
+  failures (p = 0). Schedulers: fifo and cp.
+- Every successful completion is delivered a second time with probability q ∈ {0, 0.05, 0.1,
+  0.2}, 0.5 time units later. The same instances and seeds run with the idempotent collector
+  and with the naive one (which accepts every delivery).
+- Every run is checked by the independent validator. In this ablation only, invalid runs are
+  recorded with the type of the first violation instead of aborting the run.
+
+Fraction of invalid runs [95% bootstrap CI] (invalid/total; violation types):
+
+<!-- BEGIN GENERATED: a1_idempotency -->
+Source: `results/a1/summary.csv`
+
+| q | collection | mean duplicates per run | fifo | cp |
+|---|---|---|---|---|
+| 0.0 | idempotent | 0.00 | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) |
+| 0.0 | naive | 0.00 | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) |
+| 0.05 | idempotent | 4.24 | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) |
+| 0.05 | naive | 4.24 | 0.822 [0.761, 0.878] (148/180; precedence 148, overlap 0, other 0) | 0.583 [0.511, 0.656] (105/180; precedence 105, overlap 0, other 0) |
+| 0.1 | idempotent | 8.44 | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) |
+| 0.1 | naive | 8.44 | 0.950 [0.917, 0.978] (171/180; precedence 171, overlap 0, other 0) | 0.778 [0.711, 0.839] (140/180; precedence 140, overlap 0, other 0) |
+| 0.2 | idempotent | 16.83 | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) | 0.000 [0.000, 0.000] (0/180; precedence 0, overlap 0, other 0) |
+| 0.2 | naive | 16.83 | 0.989 [0.972, 1.000] (178/180; precedence 178, overlap 0, other 0) | 0.856 [0.800, 0.906] (154/180; precedence 154, overlap 0, other 0) |
+<!-- END GENERATED: a1_idempotency -->
+
+### Observations
+
+- With idempotent collection, no run was invalid at any q, for either scheduler (0/180 in
+  every row). The ablation command treats any invalid idempotent run as a bug and would have
+  failed.
+- With naive collection and q = 0, no run was invalid: there are no duplicates to
+  mis-handle.
+- With naive collection and q > 0, most runs were invalid. fifo: 0.822, 0.950, 0.989 for
+  q = 0.05, 0.1, 0.2. cp: 0.583, 0.778, 0.856. On average a run received 4.24, 8.44 and
+  16.83 duplicate deliveries at these q.
+- Every recorded violation is a precedence violation: a task started before one of its
+  dependencies had finished. There are no overlap or other violations.
+- At each q > 0 the CIs of fifo and cp do not overlap. The difference between the two
+  schedulers was not tested pairwise.
+
+Limitations: one worker count, no failures, a single fixed duplicate delay, and a deliberately
+naive collector as the alternative; real systems may catch some duplicates by other means. A
+run counts as invalid if it has at least one violation, so the fraction does not show how
+many dependencies were violated.
+
+## RQ5: how much variance do common random numbers remove? (ablation A2)
+
+<!-- BEGIN GENERATED: setup_a2 -->
+- Command: `python -m dagsched.experiments ablation crn --out results/a2`; 14400 runs; wall time 139.6 s; commit `6c01d38` (dirty: False).
+- Source: `results/a2/metadata.json`
+<!-- END GENERATED: setup_a2 -->
+- Graphs: the 6 E1 graph specifications, graph seeds 0–29; 10 simulation seeds per graph,
+  so 300 (graph seed, sim seed) pairs per row. Workers: k = 4, speed 1. Failures: Bernoulli
+  p ∈ {0.1, 0.2}; up to 10 attempts, backoff 1 · 2^(n−1).
+- d = normalized makespan(cp) − normalized makespan(fifo) on the same pair, computed with
+  common random numbers (CRN: both schedulers face the same attempt fates) and without them
+  (each scheduler's failure draws also depend on its name).
+- Variance ratio = var(d | independent) / var(d | CRN), with a 95% bootstrap CI that
+  resamples the 300 pairs jointly. A pair is dropped if either run was partial.
+
+<!-- BEGIN GENERATED: a2_crn -->
+Source: `results/a2/summary.csv`
+
+| graph | durations | p | pairs (dropped) CRN / indep. | d with CRN: mean [CI]; sd; CI width | d independent: mean [CI]; sd; CI width | var ratio indep./CRN [CI] |
+|---|---|---|---|---|---|---|
+| layered | uniform | 0.1 | 300 (0) / 300 (0) | -0.027 [-0.030, -0.024]; sd 0.028; width 0.006 | -0.025 [-0.030, -0.020]; sd 0.047; width 0.011 | 2.76 [1.91, 4.02] |
+| layered | uniform | 0.2 | 300 (0) / 300 (0) | -0.037 [-0.043, -0.031]; sd 0.053; width 0.011 | -0.033 [-0.049, -0.014]; sd 0.151; width 0.035 | 8.07 [2.63, 19.91] |
+| layered | lognormal | 0.1 | 300 (0) / 300 (0) | -0.101 [-0.107, -0.095]; sd 0.052; width 0.012 | -0.111 [-0.123, -0.098]; sd 0.112; width 0.025 | 4.76 [3.42, 6.40] |
+| layered | lognormal | 0.2 | 300 (0) / 300 (0) | -0.097 [-0.103, -0.091]; sd 0.055; width 0.012 | -0.108 [-0.129, -0.087]; sd 0.191; width 0.042 | 11.97 [8.74, 15.73] |
+| erdos_renyi | uniform | 0.1 | 300 (0) / 300 (0) | -0.043 [-0.047, -0.039]; sd 0.038; width 0.008 | -0.044 [-0.049, -0.038]; sd 0.052; width 0.012 | 1.86 [1.35, 2.54] |
+| erdos_renyi | uniform | 0.2 | 300 (0) / 300 (0) | -0.052 [-0.058, -0.046]; sd 0.056; width 0.013 | -0.057 [-0.067, -0.046]; sd 0.094; width 0.021 | 2.79 [1.90, 4.12] |
+| erdos_renyi | lognormal | 0.1 | 300 (0) / 300 (0) | -0.109 [-0.118, -0.100]; sd 0.080; width 0.018 | -0.112 [-0.126, -0.100]; sd 0.115; width 0.026 | 2.04 [1.48, 2.93] |
+| erdos_renyi | lognormal | 0.2 | 300 (0) / 300 (0) | -0.121 [-0.132, -0.110]; sd 0.098; width 0.022 | -0.111 [-0.129, -0.094]; sd 0.151; width 0.035 | 2.38 [1.74, 3.25] |
+| fork_join | uniform | 0.1 | 300 (0) / 300 (0) | -0.092 [-0.098, -0.086]; sd 0.050; width 0.011 | -0.084 [-0.098, -0.069]; sd 0.128; width 0.029 | 6.54 [5.08, 8.38] |
+| fork_join | uniform | 0.2 | 300 (0) / 300 (0) | -0.073 [-0.080, -0.067]; sd 0.054; width 0.012 | -0.046 [-0.074, -0.020]; sd 0.246; width 0.054 | 20.43 [15.34, 26.63] |
+| fork_join | lognormal | 0.1 | 300 (0) / 300 (0) | -0.052 [-0.056, -0.048]; sd 0.036; width 0.008 | -0.052 [-0.068, -0.036]; sd 0.141; width 0.032 | 15.26 [11.60, 19.70] |
+| fork_join | lognormal | 0.2 | 300 (0) / 300 (0) | -0.040 [-0.044, -0.036]; sd 0.034; width 0.008 | -0.043 [-0.068, -0.019]; sd 0.229; width 0.049 | 43.90 [33.34, 58.24] |
+<!-- END GENERATED: a2_crn -->
+
+### Observations
+
+- No pair was dropped in either arm: all 14400 runs completed with up to 10 attempts.
+- The variance ratio is above 1 in every row, and so is the lower end of every CI. The
+  smallest ratio is 1.86 [1.35, 2.54] (Erdős–Rényi, uniform, p = 0.1). The largest is
+  43.90 [33.34, 58.24] (fork–join, lognormal, p = 0.2).
+- In each graph specification the point estimate is larger at p = 0.2 than at p = 0.1
+  (e.g. fork–join, uniform: 6.54 → 20.43). For some specifications the two CIs overlap, e.g.
+  Erdős–Rényi, lognormal: [1.48, 2.93] and [1.74, 3.25].
+- The mean differences are similar in both arms, while the CIs are narrower with CRN in
+  every row. Fork–join, lognormal, p = 0.2: CI width 0.008 with CRN vs 0.049 without. Both
+  arms estimate the same effect, but with different precision.
+- Fork–join, uniform, p = 0.2 shows the largest gap between the two means: −0.073
+  [−0.080, −0.067] with CRN vs −0.046 [−0.074, −0.020] without. The CIs overlap.
+- Because a standard error scales with sd/√n, a variance ratio r means that, in these
+  settings, about r times as many pairs would be needed without CRN to reach the same
+  precision.
+
+Limitations: only cp vs fifo, k = 4 homogeneous workers, p ≤ 0.2. The 10 simulation seeds
+of a graph share the same graph instance, so the 300 pairs are not fully independent. The
+bootstrap resamples pairs, not graphs, which may make the CIs too narrow.
 
 ## Threats to validity
 

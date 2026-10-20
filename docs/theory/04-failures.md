@@ -71,7 +71,10 @@ simulated systems. Differences between two policies on the same seed come from t
 not from different luck. The variance of the *difference* of their makespans is then usually
 much smaller than with independent draws, so fewer seeds are needed. The tests check that on
 10 random DAGs (p = 0.3, up to 5 attempts, identical workers) FIFO, Random, CP and HEFT make
-exactly the same number of attempts per task. How much variance this saves is NOT MEASURED yet.
+exactly the same number of attempts per task. How much variance this saves is measured in
+[docs/results.md, RQ5](../results.md#rq5-how-much-variance-do-common-random-numbers-remove-ablation-a2)
+(`results/a2/summary.csv`). On the tested graphs, with k = 4 and p ∈ {0.1, 0.2},
+var(d) without CRN divided by var(d) with CRN ranged from 1.86 to 43.90.
 
 ## Limitations
 - Failures are independent per attempt. Correlated failures (a worker crashing and taking all

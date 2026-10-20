@@ -129,6 +129,22 @@ def test_bound_terms_block(scratch):
     assert "| k | durations | runs | LB = W/k (work term) | LB = CP (path term) |" in block
 
 
+def test_ablation_blocks_render_from_tiny_ablations(scratch):
+    from dagsched.experiments.ablations import crn_ablation, idempotency_ablation
+
+    e1_config = SCRIPTS.parent / "configs" / "e1_homogeneous.json"
+    idempotency_ablation(scratch / "a1", e1_config, n_graph_seeds=1)
+    crn_ablation(scratch / "a2", e1_config, n_graph_seeds=2, n_sim_seeds=1)
+    idem = tables.block_idempotency(scratch)
+    assert "| q | collection | mean duplicates per run | fifo | cp |" in idem
+    assert "| 0.0 | idempotent | 0.00 | 0.000 [0.000, 0.000] (0/6;" in idem
+    crn = tables.block_crn(scratch)
+    assert crn.count("\n| layered | uniform | ") == 2  # p = 0.1 and 0.2
+    assert "var ratio indep./CRN [CI]" in crn
+    assert "ablation idempotency --out results/a1`; 96 runs" in tables.block_ablation_setup(
+        scratch, "a1")
+
+
 def test_survivorship_block_needs_checks_file(scratch):
     with pytest.raises(tables.TableError, match="run scripts/check_results.py first"):
         tables.block_survivorship(scratch)
