@@ -15,9 +15,11 @@ from dagsched.schedulers import (
 )
 from dagsched.simulator import (
     Assignment,
+    AttemptRecord,
     Scheduler,
     SchedulerView,
     SchedulingError,
+    SimulationConfig,
     SimulationResult,
     TaskRecord,
     Worker,
@@ -30,6 +32,7 @@ __version__ = "0.1.0"
 __all__ = [
     "SCHEDULERS",
     "Assignment",
+    "AttemptRecord",
     "BernoulliFailures",
     "CriticalPathScheduler",
     "CycleError",
@@ -46,6 +49,7 @@ __all__ = [
     "SchedulerView",
     "SchedulingError",
     "ScriptedFailures",
+    "SimulationConfig",
     "SimulationResult",
     "Task",
     "TaskGraph",
