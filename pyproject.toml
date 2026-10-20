@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]  # needed for the PEP 639 license expression below
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,25 @@ requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Haitam Echchakar" }]
+readme = "README.md"
+keywords = [
+    "scheduling", "DAG", "task graph", "multi-agent systems", "fault tolerance",
+    "discrete-event simulation", "HEFT", "list scheduling",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/echchakarhaitam-cyber/multiagent-dag-scheduler"
+Documentation = "https://github.com/echchakarhaitam-cyber/multiagent-dag-scheduler/blob/main/docs/README.md"
+Issues = "https://github.com/echchakarhaitam-cyber/multiagent-dag-scheduler/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
