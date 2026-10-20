@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
+experiments = ["matplotlib>=3.7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

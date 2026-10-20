@@ -2,6 +2,7 @@
 
     python -m dagsched.experiments run CONFIG --out DIR
     python -m dagsched.experiments summarize DIR [--baseline NAME]
+    python -m dagsched.experiments plot DIR --out FIGURE_DIR
 """
 
 from __future__ import annotations
@@ -28,6 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
     summarize = commands.add_parser("summarize", help="write summary.csv and paired.csv")
     summarize.add_argument("directory", type=Path, help="directory containing runs.csv")
     summarize.add_argument("--baseline", default="fifo", help="baseline scheduler (default fifo)")
+    plot = commands.add_parser("plot", help="draw figures from summary.csv (needs matplotlib)")
+    plot.add_argument("directory", type=Path, help="directory containing summary.csv")
+    plot.add_argument("--out", type=Path, required=True, help="output directory for PNG files")
     return parser
 
 
@@ -43,15 +47,23 @@ def _summarize(args: argparse.Namespace) -> None:
           f"{n_paired} comparisons vs {args.baseline!r} to {args.directory / 'paired.csv'}")
 
 
+def _plot(args: argparse.Namespace) -> None:
+    # plots.py itself imports matplotlib lazily, so this import stays cheap and stdlib-only.
+    from dagsched.experiments.plots import plot_directory
+
+    for path in plot_directory(args.directory, args.out):
+        print(f"wrote {path}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point; returns the process exit code (0 on success, 1 on a reported error)."""
+    from dagsched.experiments.plots import PlotError
+
     args = build_parser().parse_args(argv)
+    commands = {"run": _run, "summarize": _summarize, "plot": _plot}
     try:
-        if args.command == "run":
-            _run(args)
-        else:
-            _summarize(args)
-    except (ConfigError, ExperimentError, SummaryError, OSError) as exc:
+        commands[args.command](args)
+    except (ConfigError, ExperimentError, SummaryError, PlotError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0

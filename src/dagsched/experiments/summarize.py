@@ -24,7 +24,8 @@ from dagsched.stats import bootstrap_ci, holm_bonferroni, mean_std, sign_test, w
 SUMMARY_COLUMNS = (
     "graph_family", "graph_params", "k", "speeds_kind", "failure_p", "scheduler", "count",
     "n_completed", "completion_rate", "mean_normalized_makespan", "std_normalized_makespan",
-    "ci_low", "ci_high", "mean_utilization", "mean_wasted_work",
+    "ci_low", "ci_high", "mean_utilization", "mean_wasted_work", "wasted_ci_low",
+    "wasted_ci_high",
 )
 PAIRED_COLUMNS = (
     "graph_family", "graph_params", "k", "speeds_kind", "failure_p", "scheduler", "baseline",
@@ -125,6 +126,7 @@ def summarize_runs(runs: Iterable[Run]) -> list[dict[str, Any]]:
         members = groups[key]
         done = [run for run in members if run.completed]
         stats = _interval_stats([run.normalized_makespan for run in done])
+        wasted = _interval_stats([run.wasted_work for run in members])  # all runs, not only done
         rows.append({
             **dict(zip(SUMMARY_COLUMNS[:6], key)),
             "count": len(members),
@@ -135,7 +137,9 @@ def summarize_runs(runs: Iterable[Run]) -> list[dict[str, Any]]:
             "ci_low": stats["ci_low"],
             "ci_high": stats["ci_high"],
             "mean_utilization": mean_std([run.utilization for run in members])[0],
-            "mean_wasted_work": mean_std([run.wasted_work for run in members])[0],
+            "mean_wasted_work": wasted["mean"],
+            "wasted_ci_low": wasted["ci_low"],
+            "wasted_ci_high": wasted["ci_high"],
         })
     return rows
 
