@@ -386,6 +386,33 @@ Source: `results/e3/summary.csv`
 | heterogeneous | fork_join | lognormal | 0.3 | 0.97; 46.3 [36.9, 55.8] | 0.97; 45.6 [36.3, 55.5] | 0.97; 38.9 [32.0, 46.4] | 0.97; 37.6 [31.4, 44.5] |
 <!-- END GENERATED: e3_reliability -->
 
+**Survivorship.** The normalized-makespan means above, and the paired differences below, are
+**conditional on completion**: runs in which a task failed permanently stop early and are
+excluded. Partial runs per p, and the result of the all-or-none check (within one instance
+group, either every scheduler completed or none did):
+
+<!-- BEGIN GENERATED: e3_survivorship -->
+Source: `results/checks.json`, computed by `scripts/check_results.py` from `results/e3/runs.csv`
+
+| p | runs | partial runs | homogeneous | heterogeneous |
+|---|---|---|---|---|
+| 0.0 | 1440 | 0 | 0 | 0 |
+| 0.05 | 1440 | 0 | 0 | 0 |
+| 0.1 | 1440 | 0 | 0 | 0 |
+| 0.2 | 1440 | 32 | 16 | 16 |
+| 0.3 | 1440 | 256 | 128 | 128 |
+
+Instance groups (graph instance, workers, p, seed) in which only some of the schedulers completed: 0 of 1800.
+<!-- END GENERATED: e3_survivorship -->
+
+With a worker-independent p and common random numbers, every scheduler faces the same attempt
+fates, so permanent failures should not depend on the scheduler. The check confirms this on
+these runs: in every group the partial runs are the same instances for all four schedulers.
+Within a row, the means of different schedulers are therefore taken over the same set of
+instances. At p ≥ 0.2, though, that set is no longer the full sample of 30 instances (see the
+completion rates), and conditioning on completion may favour instances with fewer or shorter
+failures.
+
 Paired difference to fifo (instances where both runs completed):
 
 <!-- BEGIN GENERATED: e3_paired -->

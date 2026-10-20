@@ -1,0 +1,44 @@
+{
+  "e3_completion": {
+    "groups": 1800,
+    "violations": 0
+  },
+  "e3_partial_by_p": [
+    {
+      "failure_p": 0.0,
+      "heterogeneous": 0,
+      "homogeneous": 0,
+      "partial": 0,
+      "runs": 1440
+    },
+    {
+      "failure_p": 0.05,
+      "heterogeneous": 0,
+      "homogeneous": 0,
+      "partial": 0,
+      "runs": 1440
+    },
+    {
+      "failure_p": 0.1,
+      "heterogeneous": 0,
+      "homogeneous": 0,
+      "partial": 0,
+      "runs": 1440
+    },
+    {
+      "failure_p": 0.2,
+      "heterogeneous": 16,
+      "homogeneous": 16,
+      "partial": 32,
+      "runs": 1440
+    },
+    {
+      "failure_p": 0.3,
+      "heterogeneous": 128,
+      "homogeneous": 128,
+      "partial": 256,
+      "runs": 1440
+    }
+  ],
+  "source": "scripts/check_results.py on results/e1|e2|e3/runs.csv"
+}

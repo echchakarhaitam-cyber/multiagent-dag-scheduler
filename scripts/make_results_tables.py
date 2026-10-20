@@ -157,6 +157,29 @@ def block_reliability(results: Path, experiment: str, keys: Sequence[str]) -> st
     return _source(results, experiment, "summary.csv") + "\n\n" + markdown_table(header, body)
 
 
+def _checks(results: Path) -> dict[str, Any]:
+    path = results / "checks.json"
+    if not path.is_file():
+        raise TableError(f"missing {path} (run scripts/check_results.py first)")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _checks_source(results: Path, experiment: str) -> str:
+    return (f"Source: `{(results / 'checks.json').as_posix()}`, computed by "
+            f"`scripts/check_results.py` from `results/{experiment}/runs.csv`")
+
+
+def block_survivorship(results: Path) -> str:
+    checks = _checks(results)
+    body = [[str(r["failure_p"]), str(r["runs"]), str(r["partial"]), str(r["homogeneous"]),
+             str(r["heterogeneous"])] for r in checks["e3_partial_by_p"]]
+    completion = checks["e3_completion"]
+    table = markdown_table(["p", "runs", "partial runs", "homogeneous", "heterogeneous"], body)
+    return (f"{_checks_source(results, 'e3')}\n\n{table}\n\n"
+            f"Instance groups (graph instance, workers, p, seed) in which only some of the "
+            f"schedulers completed: {completion['violations']} of {completion['groups']}.")
+
+
 _GRAPH_KEYS = ("graph_family", "dist", "k")
 _FAILURE_KEYS = ("speeds_kind", "graph_family", "dist", "failure_p")
 BLOCKS: dict[str, Callable[[Path], str]] = {
@@ -172,6 +195,7 @@ BLOCKS: dict[str, Callable[[Path], str]] = {
                                             "paired_vs_cp.csv", speeds_kind="heterogeneous"),
     "e3_makespan": lambda r: block_makespan(r, "e3", _FAILURE_KEYS),
     "e3_reliability": lambda r: block_reliability(r, "e3", _FAILURE_KEYS),
+    "e3_survivorship": block_survivorship,
     "e3_paired": lambda r: block_paired(r, "e3", _FAILURE_KEYS),
 }
 

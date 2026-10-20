@@ -80,6 +80,35 @@ def test_check_results_detects_failures(scratch, capsys, e1_extra, e2_extra, mes
     assert any(line.startswith("[FAIL]") and message in line for line in out.splitlines())
 
 
+def test_check_results_writes_derived_numbers(scratch):
+    results = healthy_results(scratch)
+    assert check_results.main(["--results", str(results)]) == 0
+    checks = json.loads((results / "checks.json").read_text(encoding="utf-8"))
+    assert checks["e3_completion"] == {"groups": 5, "violations": 0}
+    assert checks["e3_partial_by_p"] == [
+        {"failure_p": 0.0, "runs": 2, "partial": 0, "homogeneous": 0, "heterogeneous": 0},
+        {"failure_p": 0.3, "runs": 3, "partial": 1, "homogeneous": 1, "heterogeneous": 0},
+    ]
+    block = tables.block_survivorship(results)
+    assert "| 0.3 | 3 | 1 | 1 | 0 |" in block
+    assert "only some of the schedulers completed: 0 of 5." in block
+
+
+def test_check_results_detects_scheduler_dependent_completion(scratch, capsys):
+    results = healthy_results(scratch)
+    rows = [make_run(failure_p=0.3, graph_seed=7, scheduler="fifo"),
+            make_run(failure_p=0.3, graph_seed=7, scheduler="cp", status="partial")]
+    write_runs(results / "e3", rows)
+    assert check_results.main(["--results", str(results)]) == 1
+    assert "[FAIL] e3: completed schedulers are all-or-none in 1 instance groups (violations 1)" \
+        in capsys.readouterr().out
+
+
+def test_survivorship_block_needs_checks_file(scratch):
+    with pytest.raises(tables.TableError, match="run scripts/check_results.py first"):
+        tables.block_survivorship(scratch)
+
+
 def test_check_results_missing_file(scratch, capsys):
     assert check_results.main(["--results", str(scratch)]) == 1
     assert "[FAIL] e1: runs file not found" in capsys.readouterr().out
