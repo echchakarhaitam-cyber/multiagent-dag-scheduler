@@ -1,5 +1,6 @@
 """dagsched: fault-tolerant scheduling of multi-agent task graphs."""
 
+from dagsched.bounds import lower_bound
 from dagsched.graph import CycleError, GraphValidationError, Task, TaskGraph
 from dagsched.schedulers import FIFOScheduler, RandomScheduler
 from dagsched.simulator import (
@@ -32,6 +33,7 @@ __all__ = [
     "TaskRecord",
     "Worker",
     "__version__",
+    "lower_bound",
     "simulate",
     "validate_schedule",
 ]
