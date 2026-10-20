@@ -11,6 +11,7 @@ number in a generated block is read from results/eX/summary.csv, paired.csv or m
 
     python scripts/make_results_tables.py            # rewrite the document in place
     python scripts/make_results_tables.py --check    # exit 1 if the document is out of date
+    python scripts/make_results_tables.py --readme   # the compact tables of README.md
 """
 
 from __future__ import annotations
@@ -106,7 +107,9 @@ def pivot(rows: list[dict[str, Any]], keys: Sequence[str],
 
 
 def _source(results: Path, experiment: str, filename: str) -> str:
-    return f"Source: `{(results / experiment / filename).as_posix()}`"
+    # Canonical repository-relative label, whatever directory was passed in: the documents
+    # must not depend on (or leak) where they were generated.
+    return f"Source: `results/{experiment}/{filename}`"
 
 
 def block_setup(results: Path, experiment: str) -> str:
@@ -165,7 +168,7 @@ def _checks(results: Path) -> dict[str, Any]:
 
 
 def _checks_source(results: Path, experiment: str) -> str:
-    return (f"Source: `{(results / 'checks.json').as_posix()}`, computed by "
+    return ("Source: `results/checks.json`, computed by "
             f"`scripts/check_results.py` from `results/{experiment}/runs.csv`")
 
 
@@ -252,6 +255,134 @@ def block_crn(results: Path) -> str:
     return _source(results, "a2", "summary.csv") + "\n\n" + markdown_table(header, body)
 
 
+# ----- compact blocks for README.md (--readme) ----------------------------------------------
+
+
+def _by_spec(rows: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    specs = {(r["graph_family"], r["dist"]) for r in rows}
+    return sorted(specs, key=lambda s: (FAMILIES.index(s[0]), DISTRIBUTIONS.index(s[1])))
+
+
+def _one(rows: list[dict[str, Any]], **where: Any) -> dict[str, Any]:
+    matches = [r for r in rows if all(r[key] == value for key, value in where.items())]
+    if len(matches) != 1:
+        raise TableError(f"expected one row for {where}, found {len(matches)}")
+    return matches[0]
+
+
+def _short_paired(row: dict[str, Any]) -> str:
+    return (f"{float(row['mean_difference']):+.3f} [{float(row['ci_low']):+.3f}, "
+            f"{float(row['ci_high']):+.3f}], p_H {_p(row['p_holm'])}")
+
+
+def block_readme_rq1(results: Path, k: int = 4) -> str:
+    summary = _read_csv(results / "e1" / "summary.csv")
+    paired = _read_csv(results / "e1" / "paired.csv")
+    body = []
+    for family, dist in _by_spec(summary):
+        means = [float(_one(summary, graph_family=family, dist=dist, k=k,
+                            scheduler=s)["mean_normalized_makespan"])
+                 for s in ("fifo", "random", "cp")]
+        delta = _one(paired, graph_family=family, dist=dist, k=k, scheduler="cp")
+        body.append([family, dist, *(f"{m:.3f}" for m in means), _short_paired(delta)])
+    header = ["graph", "durations", "fifo", "random", "cp = heft", "cp − fifo [CI], Holm p"]
+    return (f"E1, k = {k}, mean normalized makespan (all k: docs/results.md). Source: "
+            f"`results/e1/summary.csv`, `paired.csv`.\n\n" + markdown_table(header, body))
+
+
+def block_readme_rq2(results: Path, k: int = 8) -> str:
+    summary = _read_csv(results / "e2" / "summary.csv")
+    versus = _read_csv(results / "e2" / "paired_vs_cp.csv")
+    body = []
+    for family, dist in _by_spec(summary):
+        means = [float(_one(summary, graph_family=family, dist=dist, k=k,
+                            scheduler=s)["mean_normalized_makespan"])
+                 for s in ("fifo", "cp", "heft")]
+        delta = _one(versus, graph_family=family, dist=dist, k=k, scheduler="heft")
+        body.append([family, dist, *(f"{m:.3f}" for m in means), _short_paired(delta)])
+    header = ["graph", "durations", "fifo", "cp", "heft", "heft − cp [CI], Holm p"]
+    return (f"E2, k = {k} heterogeneous workers, mean normalized makespan (k = 4: "
+            f"docs/results.md). Source: `results/e2/summary.csv`, `paired_vs_cp.csv`.\n\n"
+            + markdown_table(header, body))
+
+
+def block_readme_rq3(results: Path) -> str:
+    summary = _read_csv(results / "e3" / "summary.csv")
+    p_values = sorted({r["failure_p"] for r in summary})
+    low, high = p_values[0], p_values[-1]
+    body = []
+    for speeds in SPEEDS:
+        for family, dist in _by_spec(summary):
+            def change(name: str, family: str = family, dist: str = dist,
+                       speeds: str = speeds) -> str:
+                values = [float(_one(summary, graph_family=family, dist=dist,
+                                     speeds_kind=speeds, failure_p=p,
+                                     scheduler=name)["mean_normalized_makespan"])
+                          for p in (low, high)]
+                return f"{values[0]:.3f} → {values[1]:.3f}"
+
+            completion = float(_one(summary, graph_family=family, dist=dist, speeds_kind=speeds,
+                                    failure_p=high, scheduler="fifo")["completion_rate"])
+            body.append([speeds, family, dist, change("fifo"), change("cp"), change("heft"),
+                         f"{completion:.2f}"])
+    header = ["workers", "graph", "durations", f"fifo (p {low} → {high})",
+              f"cp (p {low} → {high})", f"heft (p {low} → {high})", f"completion at p = {high}"]
+    return ("E3, k = 4, mean normalized makespan of completed runs (all p and paired tests: "
+            "docs/results.md). Source: `results/e3/summary.csv`.\n\n"
+            + markdown_table(header, body))
+
+
+def block_readme_rq4(results: Path) -> str:
+    rows = _read_plain_csv(results / "a1" / "summary.csv")
+
+    def cell(q: str, idempotent: str, scheduler: str) -> str:
+        (row,) = [r for r in rows if (r["duplicate_prob"], r["idempotent"], r["scheduler"])
+                  == (q, idempotent, scheduler)]
+        return (f"{float(row['invalid_fraction']):.3f} [{float(row['ci_low']):.3f}, "
+                f"{float(row['ci_high']):.3f}]")
+
+    probs = sorted({r["duplicate_prob"] for r in rows}, key=float)
+    body = [[q, cell(q, "True", "fifo"), cell(q, "True", "cp"), cell(q, "False", "fifo"),
+             cell(q, "False", "cp")] for q in probs]
+    header = ["duplicate prob. q", "idempotent, fifo", "idempotent, cp", "naive, fifo",
+              "naive, cp"]
+    return ("A1, fraction of runs with an invalid schedule [95% CI], 180 runs per cell. "
+            "Source: `results/a1/summary.csv`.\n\n" + markdown_table(header, body))
+
+
+def block_readme_rq5(results: Path) -> str:
+    rows = _read_plain_csv(results / "a2" / "summary.csv")
+    for row in rows:
+        row["dist"] = json.loads(row["graph_params"])["durations"]["dist"]
+    probs = sorted({r["failure_p"] for r in rows}, key=float)
+    body = []
+    for family, dist in _by_spec(rows):
+        cells = []
+        for p in probs:
+            (row,) = [r for r in rows if (r["graph_family"], r["dist"], r["failure_p"])
+                      == (family, dist, p)]
+            cells.append(f"{float(row['var_ratio']):.2f} [{float(row['var_ratio_ci_low']):.2f}, "
+                         f"{float(row['var_ratio_ci_high']):.2f}]")
+        body.append([family, dist, *cells])
+    header = ["graph", "durations", *(f"var ratio, p = {p} [CI]" for p in probs)]
+    return ("A2, var(d) without CRN / var(d) with CRN for d = cp − fifo, 300 pairs per cell. "
+            "Source: `results/a2/summary.csv`.\n\n" + markdown_table(header, body))
+
+
+def block_readme_walltimes(results: Path) -> str:
+    body = []
+    for name in ("e1", "e2", "e3", "a1", "a2"):
+        meta_path = results / name / "metadata.json"
+        if not meta_path.is_file():
+            raise TableError(f"missing {meta_path}")
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        what = (f"`configs/{meta['config']['name']}.json`" if "config" in meta
+                else f"`ablation {meta['ablation']}`")
+        body.append([name.upper(), what, str(meta["n_runs"]), f"{meta['wall_time_s']:.1f}"])
+    return ("Source: `results/*/metadata.json` (one run on the development laptop).\n\n"
+            + markdown_table(["experiment", "definition", "runs", "wall time (s)"], body))
+
+
 _GRAPH_KEYS = ("graph_family", "dist", "k")
 _FAILURE_KEYS = ("speeds_kind", "graph_family", "dist", "failure_p")
 BLOCKS: dict[str, Callable[[Path], str]] = {
@@ -273,6 +404,12 @@ BLOCKS: dict[str, Callable[[Path], str]] = {
     "setup_a2": lambda r: block_ablation_setup(r, "a2"),
     "a1_idempotency": block_idempotency,
     "a2_crn": block_crn,
+    "readme_rq1": block_readme_rq1,
+    "readme_rq2": block_readme_rq2,
+    "readme_rq3": block_readme_rq3,
+    "readme_rq4": block_readme_rq4,
+    "readme_rq5": block_readme_rq5,
+    "readme_walltimes": block_readme_walltimes,
     "e3_paired": lambda r: block_paired(r, "e3", _FAILURE_KEYS),
 }
 
@@ -292,7 +429,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--doc", type=Path, default=Path("docs/results.md"))
     parser.add_argument("--results", type=Path, default=Path("results"))
     parser.add_argument("--check", action="store_true", help="only check, do not write")
+    parser.add_argument("--readme", action="store_true",
+                        help="process README.md instead of --doc (its compact readme_* blocks)")
     args = parser.parse_args(argv)
+    if args.readme:
+        args.doc = Path("README.md")
     try:
         current = args.doc.read_text(encoding="utf-8")
         updated = render(current, args.results)

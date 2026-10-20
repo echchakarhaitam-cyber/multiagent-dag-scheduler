@@ -145,6 +145,22 @@ def test_ablation_blocks_render_from_tiny_ablations(scratch):
         scratch, "a1")
 
 
+REPO = SCRIPTS.parent
+
+
+@pytest.mark.parametrize("doc", ["README.md", "docs/results.md"])
+def test_committed_documents_match_committed_results(doc):
+    # Every generated table in the docs must equal what the committed CSVs produce.
+    current = (REPO / doc).read_text(encoding="utf-8")
+    assert tables.render(current, REPO / "results") == current, f"{doc} is stale"
+
+
+def test_readme_flag_targets_readme(monkeypatch, capsys):
+    monkeypatch.chdir(REPO)
+    assert tables.main(["--readme", "--check"]) == 0
+    assert "README.md is up to date" in capsys.readouterr().out
+
+
 def test_survivorship_block_needs_checks_file(scratch):
     with pytest.raises(tables.TableError, match="run scripts/check_results.py first"):
         tables.block_survivorship(scratch)
