@@ -8,20 +8,7 @@ import pytest
 
 from dagsched import CycleError, GraphValidationError, Task, TaskGraph
 
-WORKED_EXAMPLE = {
-    "A": {"duration": 2, "deps": []},
-    "B": {"duration": 3, "deps": ["A"]},
-    "C": {"duration": 1, "deps": ["A"]},
-    "D": {"duration": 4, "deps": ["B", "C"]},
-    "E": {"duration": 2, "deps": ["C"]},
-    "F": {"duration": 1, "deps": ["D", "E"]},
-}
-
-
-@pytest.fixture
-def worked() -> TaskGraph:
-    return TaskGraph.from_dict(WORKED_EXAMPLE)
-
+# The worked example (fixtures `worked` and `worked_dict`) lives in tests/conftest.py.
 
 def edges(graph: TaskGraph) -> list[tuple[str, str]]:
     return [(dep, task.id) for task in graph.tasks.values() for dep in task.deps]
@@ -115,8 +102,8 @@ def test_top_plus_bottom_level_bounded_by_critical_length(worked):
         assert top[task_id] + bottom[task_id] == length
 
 
-def test_order_independent_of_input_order():
-    tasks = list(TaskGraph.from_dict(WORKED_EXAMPLE).tasks.values())
+def test_order_independent_of_input_order(worked):
+    tasks = list(worked.tasks.values())
     reversed_graph = TaskGraph(reversed(tasks))
     assert reversed_graph.topological_order() == ("A", "B", "C", "D", "E", "F")
     assert reversed_graph.critical_path() == (10, ("A", "B", "D", "F"))
@@ -283,9 +270,9 @@ def test_tied_sources_pick_smallest_id():
     assert graph.critical_path() == (2, ("P",))
 
 
-def test_from_dict_to_dict_round_trip(worked):
+def test_from_dict_to_dict_round_trip(worked, worked_dict):
     data = worked.to_dict()
-    assert data == WORKED_EXAMPLE
+    assert data == worked_dict
     again = TaskGraph.from_dict(data)
     assert again.to_dict() == data
     assert dict(again.tasks) == dict(worked.tasks)
