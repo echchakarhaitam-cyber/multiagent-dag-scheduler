@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "dagsched: fault-tolerant scheduling of multi-agent task graphs"
+abstract: >-
+  A discrete-event simulator, scheduling policies (FIFO, random, critical-path,
+  online HEFT-style), a failure/retry/duplicate-delivery model with idempotent result
+  collection, and reproducible experiments on synthetic task graphs.
+type: software
+authors:
+  - family-names: Echchakar
+    given-names: Haitam
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/echchakarhaitam-cyber/multiagent-dag-scheduler"
+keywords:
+  - scheduling
+  - DAG
+  - multi-agent systems
+  - fault tolerance
+  - discrete-event simulation
+  - HEFT
